@@ -7,7 +7,7 @@ Run this on the DCV (where AWS credentials are available).
 Reads every job in jobs_log.jsonl, checks its AWS status, and – for each
 COMPLETED job – retrieves the measurement counts and writes them to:
 
-    jobs_results/<task-uuid>.txt
+    jobs_results/<task-uuid>.json
 
 Each file is a self-contained JSON document with the job metadata AND the
 counts dict, so the companion analysis notebook needs nothing else.
@@ -69,7 +69,7 @@ def main():
     for i, rec in enumerate(records):
         job_id   = rec["job_id"]
         uuid     = task_uuid(job_id)
-        out_path = os.path.join(OUTPUT_DIR, f"{uuid}.txt")
+        out_path = os.path.join(OUTPUT_DIR, f"{uuid}.json")
 
         print(f"[{i+1}/{len(records)}] {uuid}")
         print(f"  Submitted : {rec['datetime']}")
