@@ -1,0 +1,1 @@
+{"job_id": "arn:aws:braket:eu-north-1:767397707562:quantum-task/52a4239c-aa7d-49ff-8c7d-e030b7195bf3", "datetime": "2026-03-22T23:35:01.851924+00:00", "device": "Garnet", "device_arn": "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet", "n_prec": 2, "n_shots": 500, "seed": 42, "angles": {"phi": 4.862909272689599, "theta": 0.7710263118150256, "lam": 2.757554564287996}}
