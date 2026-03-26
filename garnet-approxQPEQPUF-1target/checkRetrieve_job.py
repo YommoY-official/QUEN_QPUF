@@ -72,7 +72,7 @@ def main():
 
         print(f"[{i+1}/{len(records)}] {uuid}")
         print(f"  Submitted : {rec['datetime']}")
-        print(f"  Device    : {rec['device']}  |  n_prec={rec['n_prec']}  "
+        print(f"  QPU       : {rec['qpu']}  |  n_prec={rec['n_prec']}  "
               f"n_shots={rec['n_shots']}")
 
         # Skip if already retrieved
@@ -96,7 +96,7 @@ def main():
 
         # Retrieve counts
         print("  Retrieving counts ...")
-        counts = retrieve_counts(job_id, rec["device"])
+        counts = retrieve_counts(job_id, rec["qpu"])
         if counts is None:
             print()
             continue
@@ -107,7 +107,7 @@ def main():
         payload = {
             "job_id":   job_id,
             "datetime": rec["datetime"],
-            "device":   rec["device"],
+            "qpu":      rec["qpu"],
             "n_prec":   rec["n_prec"],
             "n_shots":  n_shots_actual,
             "seed":     rec.get("seed"),

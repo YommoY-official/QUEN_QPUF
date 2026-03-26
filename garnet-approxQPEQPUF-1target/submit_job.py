@@ -2,16 +2,20 @@
 """
 submit_job.py
 =============
-Submits the two-stage QPE QPUF circuit to IQM Garnet on AWS.
+Submits the two-stage QPE QPUF circuit to IonQ Forte on AWS Braket.
 On success, appends a JSON record to `job_results/jobs_log.txt` for
 retrieval by checkRetrieve_job.py and result_analysis.ipynb.
+
+IonQ Forte is a trapped-ion device with all-to-all qubit connectivity,
+so no custom routing layout is required. Mid-circuit measurements are
+supported natively.
 """
 
 # ── CONFIGURATION ──────────────────────────────────────────────────────────────
-DEVICE_NAME = "Garnet"
-DEVICE_ARN  = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"
+DEVICE_NAME = "Forte-1"
+DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1"
 N_SHOTS     = 500
-N_PREC      = 7      # precision qubits per QPE stage
+N_PREC      = 14      # precision qubits per QPE stage
 SEED        = 42     # RNG seed for Haar-random unitary
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -144,7 +148,7 @@ def main():
     rng = np.random.default_rng(seed=SEED)
     unitary, angles = haar_random_1qubit_matrix(rng=rng)
 
-    print(f"Device      : {DEVICE_NAME}  ({DEVICE_ARN})")
+    print(f"QPU         : {DEVICE_NAME}  ({DEVICE_ARN})")
     print(f"N_PREC      : {N_PREC}")
     print(f"N_SHOTS     : {N_SHOTS}")
     print(f"SEED        : {SEED}")
@@ -152,7 +156,7 @@ def main():
           f"theta={angles['theta']:.6f}  lam={angles['lam']:.6f}")
 
     qc = build_full_circuit(N_PREC, angles)
-    print(f"\nCircuit qubits : {qc.num_qubits}  (IQM Garnet has 20)")
+    print(f"\nCircuit qubits : {qc.num_qubits}")
 
     try:
         from qiskit_braket_provider import BraketProvider
@@ -161,16 +165,16 @@ def main():
         print("       pip install qiskit-braket-provider")
         sys.exit(1)
 
-    provider    = BraketProvider()
-    iqm_backend = provider.get_backend(DEVICE_NAME)
+    provider  = BraketProvider()
+    backend   = provider.get_backend(DEVICE_NAME)
 
-    print(f"\nTranspiling for {iqm_backend.name} ...")
-    qc_hw = transpile(qc, backend=iqm_backend, optimization_level=1)
+    # IonQ Forte is all-to-all connected — no routing SWAPs needed.
+    print(f"\nTranspiling for {backend.name} ...")
+    qc_hw = transpile(qc, backend=backend, optimization_level=1)
     print(f"Transpiled depth : {qc_hw.depth()}")
-    print(f"CZ gates         : {qc_hw.count_ops().get('cz', 0)}")
 
     print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} ...")
-    job          = iqm_backend.run(qc_hw, shots=N_SHOTS)
+    job          = backend.run(qc_hw, shots=N_SHOTS)
     job_id       = job.job_id()
     submitted_at = datetime.now(timezone.utc).isoformat()
 
@@ -181,7 +185,7 @@ def main():
     record = {
         "job_id":     job_id,
         "datetime":   submitted_at,
-        "device":     DEVICE_NAME,
+        "qpu":        DEVICE_NAME,
         "device_arn": DEVICE_ARN,
         "n_prec":     N_PREC,
         "n_shots":    N_SHOTS,
