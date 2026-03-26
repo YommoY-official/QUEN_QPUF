@@ -11,7 +11,7 @@ retrieval by checkRetrieve_job.py and result_analysis.ipynb.
 DEVICE_NAME = "Garnet"
 DEVICE_ARN  = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"
 N_SHOTS     = 500
-N_PREC      = 9      # precision qubits per QPE stage
+N_PREC      = 7      # precision qubits per QPE stage
 SEED        = 42     # RNG seed for Haar-random unitary
 # ──────────────────────────────────────────────────────────────────────────────
 
