@@ -165,7 +165,7 @@ def main():
     iqm_backend = provider.get_backend(DEVICE_NAME)
 
     print(f"\nTranspiling for {iqm_backend.name} ...")
-    qc_hw = transpile(qc, backend=iqm_backend, optimization_level=3)
+    qc_hw = transpile(qc, backend=iqm_backend, optimization_level=1)
     print(f"Transpiled depth : {qc_hw.depth()}")
     print(f"CZ gates         : {qc_hw.count_ops().get('cz', 0)}")
 
