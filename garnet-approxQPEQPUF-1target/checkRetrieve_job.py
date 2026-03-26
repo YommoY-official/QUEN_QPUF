@@ -28,19 +28,19 @@ def task_uuid(job_id: str) -> str:
     return job_id.split("/")[-1]
 
 
-def retrieve_counts(job_id: str, device_name: str) -> dict | None:
+def retrieve_counts(job_id: str, device_arn: str) -> dict | None:
     """Retrieve Qiskit-format counts via qiskit_braket_provider."""
     try:
-        from qiskit_braket_provider import BraketProvider
+        from qiskit_braket_provider.providers import BraketBackend
+        from braket.aws import AwsDevice
     except ImportError:
         print("  ERROR: qiskit-braket-provider not installed "
               "(pip install qiskit-braket-provider)")
         return None
 
     try:
-        provider = BraketProvider()
-        backend  = provider.get_backend(device_name)
-        job_hw   = backend.retrieve_job(job_id)
+        backend = BraketBackend(device=AwsDevice(device_arn))
+        job_hw  = backend.retrieve_job(job_id)
         return job_hw.result().get_counts()
     except Exception as e:
         print(f"  ERROR retrieving counts: {e}")
@@ -96,7 +96,7 @@ def main():
 
         # Retrieve counts
         print("  Retrieving counts ...")
-        counts = retrieve_counts(job_id, rec["qpu"])
+        counts = retrieve_counts(job_id, rec["device_arn"])
         if counts is None:
             print()
             continue

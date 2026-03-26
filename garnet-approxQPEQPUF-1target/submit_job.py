@@ -159,14 +159,15 @@ def main():
     print(f"\nCircuit qubits : {qc.num_qubits}")
 
     try:
-        from qiskit_braket_provider import BraketProvider
+        from qiskit_braket_provider.providers import BraketBackend
+        from braket.aws import AwsDevice
     except ImportError:
         print("\nERROR: qiskit-braket-provider not installed.")
         print("       pip install qiskit-braket-provider")
         sys.exit(1)
 
-    provider  = BraketProvider()
-    backend   = provider.get_backend(DEVICE_NAME)
+    # Instantiate directly from ARN — avoids name-matching issues with get_backend().
+    backend = BraketBackend(device=AwsDevice(DEVICE_ARN))
 
     # IonQ Forte is all-to-all connected — no routing SWAPs needed.
     print(f"\nTranspiling for {backend.name} ...")
