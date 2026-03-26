@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-submit_1qubit_qpu.py
-====================
-Submits the two-stage QPE QPUF circuit to an AWS IQM QPU device.
-On success, appends a JSON record to `jobs_log.jsonl` for retrieval
-by the companion Jupyter notebook.
+submit_job.py
+=============
+Submits the two-stage QPE QPUF circuit to IQM Garnet on AWS.
+On success, appends a JSON record to `job_results/jobs_log.txt` for
+retrieval by checkRetrieve_job.py and result_analysis.ipynb.
 """
 
 # ── CONFIGURATION ──────────────────────────────────────────────────────────────
-DEVICE_NAME = "Garnet"                                    # BraketProvider backend name
+DEVICE_NAME = "Garnet"
 DEVICE_ARN  = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"
-N_SHOTS     = 500       # shots on hardware (see cost estimate in notebook)
-N_PREC      = 2         # precision qubits per QPE stage (keep ≤ 5 for hardware)
-SEED        = 42        # RNG seed — must match notebook to reproduce same angles
+N_SHOTS     = 500
+N_PREC      = 9      # precision qubits per QPE stage
+SEED        = 42     # RNG seed for Haar-random unitary
 # ──────────────────────────────────────────────────────────────────────────────
 
 import json
@@ -24,7 +24,8 @@ import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.circuit.library import QFTGate
 
-LOG_FILE = os.path.join(os.path.dirname(__file__), "jobs_log.jsonl")
+JOB_RESULTS_DIR = os.path.join(os.path.dirname(__file__), "job_results")
+LOG_FILE        = os.path.join(JOB_RESULTS_DIR, "jobs_log.txt")
 
 
 # ── Helper functions ───────────────────────────────────────────────────────────
@@ -78,10 +79,8 @@ def build_qpe_circuit(n_prec: int, angles: dict) -> QuantumCircuit:
     theta = angles['theta']
     lam   = angles['lam']
 
-    # Step 1: Hadamard on precision qubits
     qc.h(prec)
 
-    # Step 2: Controlled-U^(2^k)
     for k in range(n_prec):
         ctrl = prec[k]
         for _ in range(2 ** k):
@@ -89,7 +88,6 @@ def build_qpe_circuit(n_prec: int, angles: dict) -> QuantumCircuit:
             qc.cry(theta, ctrl, targ)
             qc.crz(phi,   ctrl, targ)
 
-    # Step 3: Inverse QFT
     iqft = QFTGate(n_prec).inverse()
     qc.append(iqft, prec)
 
@@ -133,7 +131,8 @@ def build_full_circuit(n_prec: int, angles: dict) -> QuantumCircuit:
 
 
 def append_job_log(record: dict):
-    """Append a JSON record to the log file (one record per line)."""
+    """Append a JSON record (one per line) to jobs_log.txt."""
+    os.makedirs(JOB_RESULTS_DIR, exist_ok=True)
     with open(LOG_FILE, 'a') as f:
         f.write(json.dumps(record) + '\n')
     print(f"Job record written to: {LOG_FILE}")
@@ -142,17 +141,16 @@ def append_job_log(record: dict):
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
-    # Generate Haar-random unitary (same seed → same circuit as notebook)
     rng = np.random.default_rng(seed=SEED)
     unitary, angles = haar_random_1qubit_matrix(rng=rng)
 
     print(f"Device      : {DEVICE_NAME}  ({DEVICE_ARN})")
     print(f"N_PREC      : {N_PREC}")
     print(f"N_SHOTS     : {N_SHOTS}")
+    print(f"SEED        : {SEED}")
     print(f"Euler angles: phi={angles['phi']:.6f}  "
           f"theta={angles['theta']:.6f}  lam={angles['lam']:.6f}")
 
-    # Build and transpile circuit
     qc = build_full_circuit(N_PREC, angles)
     print(f"\nCircuit qubits : {qc.num_qubits}  (IQM Garnet has 20)")
 
@@ -166,30 +164,28 @@ def main():
     provider    = BraketProvider()
     iqm_backend = provider.get_backend(DEVICE_NAME)
 
-    print(f"\nTranspiling for {iqm_backend.name} …")
+    print(f"\nTranspiling for {iqm_backend.name} ...")
     qc_hw = transpile(qc, backend=iqm_backend, optimization_level=3)
     print(f"Transpiled depth : {qc_hw.depth()}")
     print(f"CZ gates         : {qc_hw.count_ops().get('cz', 0)}")
 
-    # Submit
-    print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} …")
-    job = iqm_backend.run(qc_hw, shots=N_SHOTS)
-    job_id = job.job_id()
+    print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} ...")
+    job          = iqm_backend.run(qc_hw, shots=N_SHOTS)
+    job_id       = job.job_id()
     submitted_at = datetime.now(timezone.utc).isoformat()
 
     print(f"Job submitted successfully.")
     print(f"Job ID    : {job_id}")
     print(f"Timestamp : {submitted_at}")
 
-    # Log job metadata
     record = {
-        "job_id":       job_id,
-        "datetime":     submitted_at,
-        "device":       DEVICE_NAME,
-        "device_arn":   DEVICE_ARN,
-        "n_prec":       N_PREC,
-        "n_shots":      N_SHOTS,
-        "seed":         SEED,
+        "job_id":     job_id,
+        "datetime":   submitted_at,
+        "device":     DEVICE_NAME,
+        "device_arn": DEVICE_ARN,
+        "n_prec":     N_PREC,
+        "n_shots":    N_SHOTS,
+        "seed":       SEED,
         "angles": {
             "phi":   angles['phi'],
             "theta": angles['theta'],

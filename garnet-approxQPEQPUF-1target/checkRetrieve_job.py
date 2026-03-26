@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-retrieve_jobs.py
-================
+checkRetrieve_job.py
+====================
 Run this on the DCV (where AWS credentials are available).
 
-Reads every job in jobs_log.jsonl, checks its AWS status, and – for each
-COMPLETED job – retrieves the measurement counts and writes them to:
+Reads every job in job_results/jobs_log.txt, checks its AWS status, and –
+for each COMPLETED job – retrieves the measurement counts and writes them to:
 
-    jobs_results/<task-uuid>.json
+    job_results/<task-uuid>.json
 
 Each file is a self-contained JSON document with the job metadata AND the
-counts dict, so the companion analysis notebook needs nothing else.
+counts dict, so the result_analysis notebook needs nothing else.
 """
 
 import json
@@ -19,8 +19,8 @@ import sys
 
 from braket.aws import AwsQuantumTask
 
-LOG_FILE    = os.path.join(os.path.dirname(__file__), "jobs_log.jsonl")
-OUTPUT_DIR  = os.path.join(os.path.dirname(__file__), "jobs_results")
+JOB_RESULTS_DIR = os.path.join(os.path.dirname(__file__), "job_results")
+LOG_FILE        = os.path.join(JOB_RESULTS_DIR, "jobs_log.txt")
 
 
 def task_uuid(job_id: str) -> str:
@@ -48,28 +48,27 @@ def retrieve_counts(job_id: str, device_name: str) -> dict | None:
 
 
 def main():
-    # ── Load log ──────────────────────────────────────────────────────────
     if not os.path.exists(LOG_FILE):
-        print(f"ERROR: {LOG_FILE} not found. Run submit_1qubit_qpu.py first.")
+        print(f"ERROR: {LOG_FILE} not found. Run submit_job.py first.")
         sys.exit(1)
 
     with open(LOG_FILE) as f:
         records = [json.loads(line) for line in f if line.strip()]
 
     if not records:
-        print("ERROR: jobs_log.jsonl is empty.")
+        print("ERROR: jobs_log.txt is empty.")
         sys.exit(1)
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(JOB_RESULTS_DIR, exist_ok=True)
     print(f"Found {len(records)} job(s) in {LOG_FILE}")
-    print(f"Output directory: {OUTPUT_DIR}\n")
+    print(f"Output directory: {JOB_RESULTS_DIR}\n")
 
     saved = 0
 
     for i, rec in enumerate(records):
         job_id   = rec["job_id"]
         uuid     = task_uuid(job_id)
-        out_path = os.path.join(OUTPUT_DIR, f"{uuid}.json")
+        out_path = os.path.join(JOB_RESULTS_DIR, f"{uuid}.json")
 
         print(f"[{i+1}/{len(records)}] {uuid}")
         print(f"  Submitted : {rec['datetime']}")
@@ -96,7 +95,7 @@ def main():
             continue
 
         # Retrieve counts
-        print("  Retrieving counts …")
+        print("  Retrieving counts ...")
         counts = retrieve_counts(job_id, rec["device"])
         if counts is None:
             print()
@@ -105,16 +104,15 @@ def main():
         n_shots_actual = sum(counts.values())
         print(f"  Retrieved {n_shots_actual} shots, {len(counts)} unique outcomes.")
 
-        # Write result file
         payload = {
-            "job_id":    job_id,
-            "datetime":  rec["datetime"],
-            "device":    rec["device"],
-            "n_prec":    rec["n_prec"],
-            "n_shots":   n_shots_actual,
-            "seed":      rec.get("seed"),
-            "angles":    rec["angles"],
-            "counts":    counts,
+            "job_id":   job_id,
+            "datetime": rec["datetime"],
+            "device":   rec["device"],
+            "n_prec":   rec["n_prec"],
+            "n_shots":  n_shots_actual,
+            "seed":     rec.get("seed"),
+            "angles":   rec["angles"],
+            "counts":   counts,
         }
 
         with open(out_path, "w") as f:
@@ -123,7 +121,7 @@ def main():
         print(f"  Saved → {out_path}\n")
         saved += 1
 
-    print(f"Done. {saved}/{len(records)} job result(s) available in {OUTPUT_DIR}/")
+    print(f"Done. {saved}/{len(records)} job result(s) available in {JOB_RESULTS_DIR}/")
 
 
 if __name__ == "__main__":
