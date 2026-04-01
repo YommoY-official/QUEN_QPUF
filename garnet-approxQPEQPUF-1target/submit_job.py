@@ -63,12 +63,54 @@ def haar_random_1qubit_matrix(rng=None):
     return U, dict(phi=phi, theta=theta, lam=lam)
 
 
+def zyz_angles(M: np.ndarray):
+    """
+    Extract (phi, theta, lam) from a 2×2 SU(2) matrix M = Rz(phi)@Ry(theta)@Rz(lam).
+
+    From the ZYZ matrix elements:
+      M[0,0] = e^{-i(phi+lam)/2} cos(theta/2)  →  theta = 2*arccos(|M[0,0]|)
+      M[0,1] = -e^{-i(phi-lam)/2} sin(theta/2)
+    Solving:
+      phi = -(angle(M[0,0]) + angle(-M[0,1]))
+      lam =   angle(-M[0,1]) - angle(M[0,0])
+    """
+    a = M[0, 0]
+    b = M[0, 1]
+    cos_half = float(np.clip(np.abs(a), 0.0, 1.0))
+    theta = 2.0 * np.arccos(cos_half)
+    if np.abs(np.sin(theta / 2.0)) < 1e-10:
+        # Near-identity: only phi+lam is determined; set lam=0
+        phi = -2.0 * float(np.angle(a))
+        lam = 0.0
+    else:
+        phi = -(float(np.angle(a)) + float(np.angle(-b)))
+        lam =   float(np.angle(-b)) - float(np.angle(a))
+    return phi, theta, lam
+
+
+def _build_U(angles: dict) -> np.ndarray:
+    """Reconstruct the 2×2 unitary matrix from ZYZ angles."""
+    phi, theta, lam = angles['phi'], angles['theta'], angles['lam']
+
+    def Rz(a):
+        return np.array([[np.exp(-1j * a / 2), 0.0],
+                         [0.0,                 np.exp(1j * a / 2)]])
+
+    def Ry(a):
+        return np.array([[ np.cos(a / 2), -np.sin(a / 2)],
+                         [ np.sin(a / 2),  np.cos(a / 2)]])
+
+    return Rz(phi) @ Ry(theta) @ Rz(lam)
+
+
 def build_qpe_circuit(n_prec: int, angles: dict) -> QuantumCircuit:
     """
-    Build a 1-qubit QPE sub-circuit using direct controlled-RzRyRz gates.
+    Build a 1-qubit QPE sub-circuit using matrix squaring.
 
     U = Rz(phi) @ Ry(theta) @ Rz(lam)  (Haar-random, ZYZ decomposition)
-    U^(2^k) is realised by repeating the gate sequence 2^k times.
+    U^(2^k) is computed via repeated squaring and re-decomposed into ZYZ angles,
+    so each precision qubit requires exactly 3 controlled gates (O(n_prec) total)
+    instead of repeating U 2^k times (O(2^n_prec) total).
 
     Qubit layout: [prec[0], ..., prec[n_prec-1], target]
     """
@@ -79,18 +121,17 @@ def build_qpe_circuit(n_prec: int, angles: dict) -> QuantumCircuit:
     prec = list(range(n_prec))
     targ = n_prec
 
-    phi   = angles['phi']
-    theta = angles['theta']
-    lam   = angles['lam']
-
     qc.h(prec)
+
+    M = _build_U(angles)   # M = U^(2^0) = U^1
 
     for k in range(n_prec):
         ctrl = prec[k]
-        for _ in range(2 ** k):
-            qc.crz(lam,   ctrl, targ)
-            qc.cry(theta, ctrl, targ)
-            qc.crz(phi,   ctrl, targ)
+        p, t, l = zyz_angles(M)   # decompose current U^(2^k)
+        qc.crz(l, ctrl, targ)
+        qc.cry(t, ctrl, targ)
+        qc.crz(p, ctrl, targ)
+        M = M @ M                 # M → U^(2^(k+1)) for next qubit
 
     iqft = QFTGate(n_prec).inverse()
     qc.append(iqft, prec)
