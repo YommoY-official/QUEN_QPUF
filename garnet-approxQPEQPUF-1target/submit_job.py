@@ -163,7 +163,7 @@ def build_full_circuit(n_prec: int, angles: dict) -> QuantumCircuit:
 
     # Mid-circuit measurement → collapses target onto eigenstate of U
     qc.measure(prec1_reg, c1)
-    qc.barrier(label='collapse')
+    # barrier removed — not supported on IonQ Forte via Braket
 
     # Stage 2 QPE on the collapsed target
     qpe2 = build_qpe_circuit(n_prec, angles)
