@@ -14,7 +14,7 @@ supported natively.
 # ── CONFIGURATION ──────────────────────────────────────────────────────────────
 DEVICE_NAME = "Forte-1"
 DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1"
-N_SHOTS     = 500
+N_SHOTS     = 400
 N_PREC      = 7       # precision qubits per QPE stage
 SEED        = 42     # RNG seed for Haar-random unitary
 # ──────────────────────────────────────────────────────────────────────────────
@@ -227,10 +227,20 @@ def main():
     # IonQ Forte is all-to-all connected — no routing SWAPs needed.
     print(f"\nTranspiling for {backend.name} ...")
     qc_hw = transpile(qc, backend=backend, optimization_level=1)
+    n_gates = qc_hw.size()
     print(f"Transpiled depth : {qc_hw.depth()}")
+    print(f"Transpiled gates : {n_gates}")
 
-    print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} ...")
-    job          = backend.run(qc_hw, shots=N_SHOTS)
+    GATE_SHOT_LIMIT = 1_000_000
+    n_shots = N_SHOTS
+    if n_gates * n_shots > GATE_SHOT_LIMIT:
+        n_shots = GATE_SHOT_LIMIT // n_gates
+        print(f"\nWARNING: gates × shots would exceed {GATE_SHOT_LIMIT:,}.")
+        print(f"         Reducing shots: {N_SHOTS} → {n_shots}  "
+              f"({n_gates} gates × {n_shots} shots = {n_gates * n_shots:,})")
+
+    print(f"\nSubmitting {n_shots} shots to {DEVICE_NAME} ...")
+    job          = backend.run(qc_hw, shots=n_shots)
     job_id       = job.job_id()
     submitted_at = datetime.now(timezone.utc).isoformat()
 
@@ -239,13 +249,15 @@ def main():
     print(f"Timestamp : {submitted_at}")
 
     record = {
-        "job_id":     job_id,
-        "datetime":   submitted_at,
-        "qpu":        DEVICE_NAME,
-        "device_arn": DEVICE_ARN,
-        "n_prec":     N_PREC,
-        "n_shots":    N_SHOTS,
-        "seed":       SEED,
+        "job_id":          job_id,
+        "datetime":        submitted_at,
+        "qpu":             DEVICE_NAME,
+        "device_arn":      DEVICE_ARN,
+        "n_prec":          N_PREC,
+        "n_shots":         n_shots,
+        "n_shots_requested": N_SHOTS,
+        "n_gates":         n_gates,
+        "seed":            SEED,
         "angles": {
             "phi":   angles['phi'],
             "theta": angles['theta'],
