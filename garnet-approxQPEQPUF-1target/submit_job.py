@@ -14,8 +14,8 @@ supported natively.
 # ── CONFIGURATION ──────────────────────────────────────────────────────────────
 DEVICE_NAME = "Forte-1"
 DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1"
-N_SHOTS     = 200
-N_PREC      = 9       # precision qubits per QPE stage
+N_SHOTS     = 100
+N_PREC      = 10       # precision qubits per QPE stage
 SEED        = 100     # RNG seed for Haar-random unitary
 # ──────────────────────────────────────────────────────────────────────────────
 
