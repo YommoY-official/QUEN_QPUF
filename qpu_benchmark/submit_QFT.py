@@ -44,14 +44,6 @@ LOG_FILE        = os.path.join(JOB_RESULTS_DIR, "job_log.txt")
 COMPANY_DEVICES = {
     "ionq": [
         {
-            "name": "Aria-1",
-            "arn":  "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1",
-        },
-        {
-            "name": "Aria-2",
-            "arn":  "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-2",
-        },
-        {
             "name": "Forte-1",
             "arn":  "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1",
         },
@@ -62,8 +54,8 @@ COMPANY_DEVICES = {
     ],
     "aqt": [
         {
-            "name": "IBEX-Q1",
-            "arn":  "arn:aws:braket:eu-west-2::device/qpu/aqt/IBEX-Q1",  # ← verify
+            "name": "Ibex-Q1",
+            "arn":  "arn:aws:braket:eu-north-1::device/qpu/aqt/Ibex-Q1",
         },
     ],
     "rigetti": [
@@ -72,8 +64,8 @@ COMPANY_DEVICES = {
             "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3",
         },
         {
-            "name": "Cepheus-1",
-            "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1",  # ← verify
+            "name": "Cepheus-1-108Q",
+            "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
         },
     ],
     "iqm": [
@@ -90,12 +82,27 @@ COMPANY_DEVICES = {
 
 # ── Circuit builder ────────────────────────────────────────────────────────────
 def build_qft(n: int) -> Circuit:
-    """n-qubit QFT using native Braket gates (H, CPhaseShift, SWAP)."""
+    """
+    n-qubit QFT decomposed into H, CNOT, PhaseShift, and SWAP gates.
+
+    CPhaseShift(θ) is avoided because some devices (e.g. Forte-Enterprise-1)
+    do not support it. It is decomposed as:
+      PhaseShift(θ/2) on control
+      CNOT(control, target)
+      PhaseShift(-θ/2) on target
+      CNOT(control, target)
+      PhaseShift(θ/2) on target
+    """
     circ = Circuit()
     for i in range(n):
         circ.h(i)
         for j in range(i + 1, n):
-            circ.cphaseshift(j, i, np.pi / 2 ** (j - i))
+            angle = np.pi / 2 ** (j - i)
+            circ.phaseshift(j, angle / 2)
+            circ.cnot(j, i)
+            circ.phaseshift(i, -angle / 2)
+            circ.cnot(j, i)
+            circ.phaseshift(i, angle / 2)
     for i in range(n // 2):
         circ.swap(i, n - 1 - i)
     return circ

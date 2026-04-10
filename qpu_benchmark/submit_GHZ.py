@@ -49,14 +49,6 @@ LOG_FILE        = os.path.join(JOB_RESULTS_DIR, "job_log.txt")
 COMPANY_DEVICES = {
     "ionq": [
         {
-            "name": "Aria-1",
-            "arn":  "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1",
-        },
-        {
-            "name": "Aria-2",
-            "arn":  "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-2",
-        },
-        {
             "name": "Forte-1",
             "arn":  "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1",
         },
@@ -67,8 +59,8 @@ COMPANY_DEVICES = {
     ],
     "aqt": [
         {
-            "name": "IBEX-Q1",
-            "arn":  "arn:aws:braket:eu-west-2::device/qpu/aqt/IBEX-Q1",  # ← verify
+            "name": "Ibex-Q1",
+            "arn":  "arn:aws:braket:eu-north-1::device/qpu/aqt/Ibex-Q1",
         },
     ],
     "rigetti": [
@@ -77,8 +69,8 @@ COMPANY_DEVICES = {
             "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3",
         },
         {
-            "name": "Cepheus-1",
-            "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1",  # ← verify
+            "name": "Cepheus-1-108Q",
+            "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
         },
     ],
     "iqm": [
