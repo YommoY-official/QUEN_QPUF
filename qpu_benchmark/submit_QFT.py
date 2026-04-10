@@ -22,12 +22,19 @@ import os
 from datetime import datetime, timezone
 
 import numpy as np
-from braket.aws import AwsDevice, AwsSession
+import boto3
+from braket.aws import AwsDevice
 from braket.circuits import Circuit
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 S3_PREFIX = "qpu-benchmark"
 SHOTS     = 256
+
+def get_default_bucket() -> str:
+    """Return the default Braket S3 bucket for this account and region."""
+    region     = boto3.session.Session().region_name
+    account_id = boto3.client("sts").get_caller_identity()["Account"]
+    return f"amazon-braket-{region}-{account_id}"
 
 JOB_RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "job_results")
 LOG_FILE        = os.path.join(JOB_RESULTS_DIR, "job_log.txt")
@@ -147,7 +154,7 @@ def main():
 
             submitted_at = datetime.now(timezone.utc).isoformat()
             try:
-                s3_bucket = AwsSession().get_default_bucket()
+                s3_bucket = get_default_bucket()
                 task    = device.run(
                     circ,
                     shots=SHOTS,
