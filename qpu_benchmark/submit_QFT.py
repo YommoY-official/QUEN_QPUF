@@ -83,26 +83,29 @@ COMPANY_DEVICES = {
 # ── Circuit builder ────────────────────────────────────────────────────────────
 def build_qft(n: int) -> Circuit:
     """
-    n-qubit QFT decomposed into H, CNOT, PhaseShift, and SWAP gates.
+    n-qubit QFT decomposed into H, CNOT, Rz, and SWAP gates.
 
-    CPhaseShift(θ) is avoided because some devices (e.g. Forte-Enterprise-1)
-    do not support it. It is decomposed as:
-      PhaseShift(θ/2) on control
+    CPhaseShift(θ) is replaced by a decomposition using only CNOT and Rz,
+    which are supported on all Braket QPUs including IonQ Forte-Enterprise-1:
+      Rz(θ/2)  on control
       CNOT(control, target)
-      PhaseShift(-θ/2) on target
+      Rz(-θ/2) on target
       CNOT(control, target)
-      PhaseShift(θ/2) on target
+      Rz(θ/2)  on target
+
+    This implements CPhaseShift(θ) up to a global phase, which does not
+    affect measurement outcomes.
     """
     circ = Circuit()
     for i in range(n):
         circ.h(i)
         for j in range(i + 1, n):
             angle = np.pi / 2 ** (j - i)
-            circ.phaseshift(j, angle / 2)
+            circ.rz(j, angle / 2)
             circ.cnot(j, i)
-            circ.phaseshift(i, -angle / 2)
+            circ.rz(i, -angle / 2)
             circ.cnot(j, i)
-            circ.phaseshift(i, angle / 2)
+            circ.rz(i, angle / 2)
     for i in range(n // 2):
         circ.swap(i, n - 1 - i)
     return circ
