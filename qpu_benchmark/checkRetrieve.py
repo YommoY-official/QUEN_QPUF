@@ -99,17 +99,16 @@ def main():
         uuid     = task_uuid(task_id)
         out_path = os.path.join(JOB_RESULTS_DIR, f"{uuid}.json")
 
+        # Skip silently if already retrieved
+        if os.path.exists(out_path):
+            skipped += 1
+            saved   += 1
+            continue
+
         print(f"[{i+1}/{len(records)}] {uuid}")
         print(f"  Submitted : {rec['submitted_at']}")
         print(f"  Device    : {rec['device']}  |  "
               f"Circuit: {rec['circuit_type']}  |  Qubits: {rec['n_qubits']}")
-
-        # Skip if already retrieved
-        if os.path.exists(out_path):
-            print("  Already saved — skipping.\n")
-            skipped += 1
-            saved   += 1
-            continue
 
         # Check status on AWS
         try:
