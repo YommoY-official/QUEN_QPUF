@@ -213,6 +213,10 @@ def main():
 
         # Submit half-qubit and full-qubit jobs
         for n_total in [max_qubits // 2, max_qubits]:
+            # QPE uses n_counting + 1 qubits total; floor to even so the
+            # circuit never exceeds the device limit when max_qubits is odd.
+            if n_total % 2 == 1:
+                n_total -= 1
             if n_total < 2:
                 continue
             n_counting = n_total - 1
