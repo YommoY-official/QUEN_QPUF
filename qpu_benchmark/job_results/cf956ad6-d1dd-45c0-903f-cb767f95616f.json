@@ -1,0 +1,22 @@
+{
+  "task_id": "arn:aws:braket:us-east-1:767397707562:quantum-task/cf956ad6-d1dd-45c0-903f-cb767f95616f",
+  "submitted_at": "2026-04-24T07:53:30.911066+00:00",
+  "completed_at": "2026-04-24T07:59:33.050000+00:00",
+  "queue_time_seconds": 360.184,
+  "wall_time_seconds": 362.138934,
+  "qpu_time_seconds": null,
+  "device": "Forte-Enterprise-1",
+  "device_arn": "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1",
+  "circuit_type": "QPE",
+  "n_qubits": 10,
+  "n_shots_requested": 256,
+  "n_shots_actual": 256,
+  "counts": {
+    "0000000001": 1,
+    "0000001001": 249,
+    "0100001001": 2,
+    "0001001001": 1,
+    "0000101001": 1,
+    "0000011001": 2
+  }
+}
