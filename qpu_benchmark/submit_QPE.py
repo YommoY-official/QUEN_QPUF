@@ -145,17 +145,16 @@ def build_qpe(n_counting: int) -> Circuit:
         _cphase(circ, counting[k], target, angle)
 
     # Step 4 — Inverse QFT on counting qubits
-    # Bit-reversal swaps first (mirrors the QFT swap step)
-    for i in range(n_counting // 2):
-        circ.swap(counting[i], counting[n_counting - 1 - i])
-
-    # Inverse QFT rotations: work from most-significant to least-significant,
-    # negate all CPhaseShift angles relative to forward QFT.
+    # Rotations + Hadamards FIRST
     for i in range(n_counting - 1, -1, -1):
         for j in range(n_counting - 1, i, -1):
             angle = -np.pi / 2 ** (j - i)
             _cphase(circ, counting[j], counting[i], angle)
         circ.h(counting[i])
+
+    # Bit-reversal swaps LAST
+    for i in range(n_counting // 2):
+        circ.swap(counting[i], counting[n_counting - 1 - i])
 
     return circ
 
