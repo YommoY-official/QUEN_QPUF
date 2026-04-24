@@ -1,42 +1,31 @@
 #!/usr/bin/env python3
 """
-submit_QPE.py
-=============
+submit_QPE.py  (CORRECTED)
+===========================
+Fixes two compounding bugs in the original build_qpe():
+
+  BUG 1 — Controlled-power ordering.
+    The original code applied controlled-U^(2^k) with counting qubit k as
+    control (so qubit 0 was LSB). For QPE where qubit 0 is read as the MSB of
+    the output integer (the standard convention, and the convention implicit
+    when measurement results are interpreted as integers with qubit 0
+    leftmost), counting qubit k must control U^(2^(n_counting-1-k)).
+
+  BUG 2 — Inverse-QFT swap position.
+    The original code placed the SWAP cascade at the END of the inverse QFT.
+    Because the forward QFT itself ends with SWAPs, its inverse must BEGIN
+    with SWAPs. Placing swaps at the end of the inverse QFT left a residual
+    bit-reversal in the output.
+
+The two bugs compose to a double bit-reversal, which becomes the identity
+permutation only when the output is symmetric under bit-reversal. For
+phi = 1/8 the ideal bin is 2^(n_counting) / 8 = 2^(n_counting-3); this
+accidentally coincides with the bug-induced bin (which is always 4) only at
+n_counting = 5. That explains why the local-simulator sanity check for n=5
+passed, and why every hardware run for other n values showed peak_acc ≈ 0.
+
 Usage: python submit_QPE.py <company>
   company: ionq | aqt | rigetti | iqm
-
-Interactive flow:
-  1. Lists all devices for the chosen company with status and qubit count.
-  2. Prompts user to select an ONLINE device.
-  3. Prompts user to enter the number of qubits (n_total; 1 qubit is reserved
-     as the target, so n_counting = n_total - 1).
-  4. Submits one QPE job and logs the result.
-
-Quantum Phase Estimation circuit:
-  Unitary  : T gate  (U = T, phase φ = 1/8, eigenstate |1⟩)
-  Counting qubits : n_counting = n_total - 1
-  Target qubit    : 1 qubit (initialized to |1⟩, eigenstate of T)
-
-  Circuit steps:
-    1. X on target qubit  → prepare eigenstate |1⟩
-    2. H on each counting qubit
-    3. Controlled-T^(2^k) for counting qubit k  (phase kickback)
-    4. Inverse QFT on counting qubits
-    5. Measure all (counting qubits encode the estimated phase)
-
-  All gates decomposed into H, X, CNOT, Rz — supported on all Braket QPUs.
-  CPhaseShift(θ) decomposition:
-    Rz(θ/2)  on control
-    CNOT(control, target)
-    Rz(-θ/2) on target
-    CNOT(control, target)
-    Rz(θ/2)  on target
-
-Appends one JSON record per submitted task to:
-  qpu_benchmark/job_results/job_log.txt
-
-Each record contains: task_id, submitted_at, device, device_arn,
-circuit_type (QPE), n_qubits, n_counting, n_shots, phase_target.
 """
 
 import sys
@@ -55,7 +44,6 @@ SHOTS        = 256
 PHASE_TARGET = 1 / 8   # T gate eigenvalue phase: e^(2πi * 1/8)
 
 def get_default_bucket() -> str:
-    """Return the default Braket S3 bucket for this account and region."""
     region     = boto3.session.Session().region_name
     account_id = boto3.client("sts").get_caller_identity()["Account"]
     return f"amazon-braket-{region}-{account_id}"
@@ -63,51 +51,37 @@ def get_default_bucket() -> str:
 JOB_RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "job_results")
 LOG_FILE        = os.path.join(JOB_RESULTS_DIR, "job_log.txt")
 
-# ── Company → Device map ───────────────────────────────────────────────────────
 COMPANY_DEVICES = {
     "ionq": [
-        {
-            "name": "Forte-1",
-            "arn":  "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1",
-        },
-        {
-            "name": "Forte-Enterprise-1",
-            "arn":  "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1",
-        },
+        {"name": "Forte-1",
+         "arn":  "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1"},
+        {"name": "Forte-Enterprise-1",
+         "arn":  "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"},
     ],
     "aqt": [
-        {
-            "name": "Ibex-Q1",
-            "arn":  "arn:aws:braket:eu-north-1::device/qpu/aqt/Ibex-Q1",
-        },
+        {"name": "Ibex-Q1",
+         "arn":  "arn:aws:braket:eu-north-1::device/qpu/aqt/Ibex-Q1"},
     ],
     "rigetti": [
-        {
-            "name": "Ankaa-3",
-            "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3",
-        },
-        {
-            "name": "Cepheus-1-108Q",
-            "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
-        },
+        {"name": "Ankaa-3",
+         "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3"},
+        {"name": "Cepheus-1-108Q",
+         "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q"},
     ],
     "iqm": [
-        {
-            "name": "Garnet",
-            "arn":  "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet",
-        },
-        {
-            "name": "Emerald",
-            "arn":  "arn:aws:braket:eu-north-1::device/qpu/iqm/Emerald",  # ← verify
-        },
+        {"name": "Garnet",
+         "arn":  "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"},
+        {"name": "Emerald",
+         "arn":  "arn:aws:braket:eu-north-1::device/qpu/iqm/Emerald"},
     ],
 }
 
-# ── Circuit builder ────────────────────────────────────────────────────────────
+
+# ── Gate decompositions ────────────────────────────────────────────────────────
 def _cphase(circ: Circuit, control: int, target: int, angle: float):
     """
-    Decomposed CPhaseShift(angle) using CNOT and Rz only.
-    Applies phase e^(i*angle) when both qubits are |1⟩.
+    CPhaseShift(angle) decomposed into Rz + CNOT. Correct up to global phase.
+    Applies e^{i*angle} when both qubits are |1⟩.
     """
     circ.rz(control, angle / 2)
     circ.cnot(control, target)
@@ -116,49 +90,60 @@ def _cphase(circ: Circuit, control: int, target: int, angle: float):
     circ.rz(target, angle / 2)
 
 
+# ── Circuit builder (CORRECTED) ────────────────────────────────────────────────
 def build_qpe(n_counting: int) -> Circuit:
     """
-    QPE circuit for the T gate (phase φ = 1/8).
+    Textbook QPE for U = T (phase φ = 1/8), eigenstate |1⟩.
 
     Layout:
-      qubits 0 .. n_counting-1  : counting register
-      qubit  n_counting          : target (eigenstate qubit)
+      counting register : qubits 0 .. n_counting-1  (qubit 0 is MSB)
+      target qubit      : qubit  n_counting          (initialized to |1⟩)
+
+    After execution, the measurement bitstring read as an integer with qubit 0
+    as the most significant bit gives the QPE estimate m, where m / 2^n_counting
+    approximates the eigenphase φ. For φ = 1/8 this is exact for n_counting ≥ 3,
+    so the ideal peak bin is 2^n_counting / 8.
     """
     target   = n_counting
     counting = list(range(n_counting))
 
     circ = Circuit()
 
-    # Step 1 — Prepare eigenstate |1⟩ on target qubit
+    # Prepare eigenstate |1⟩ on target qubit
     circ.x(target)
 
-    # Step 2 — Hadamard on all counting qubits
+    # Hadamard on all counting qubits
     for k in counting:
         circ.h(k)
 
-    # Step 3 — Controlled-T^(2^k) for each counting qubit k
+    # Controlled-T^(2^(n_counting-1-k)) for counting qubit k.
+    # Qubit 0 (MSB) controls the largest power; qubit n_counting-1 (LSB) controls T^1.
     for k in range(n_counting):
-        angle = (np.pi / 4) * (2 ** k) % (2 * np.pi)
+        power = 2 ** (n_counting - 1 - k)
+        angle = (np.pi / 4) * power % (2 * np.pi)
         _cphase(circ, counting[k], target, angle)
 
-    # Step 4 — Inverse QFT on counting qubits
-    # Rotations + Hadamards FIRST
+    # Inverse QFT on the counting register.
+    # Forward QFT = (H + CR cascade) then SWAPs, so QFT^{-1} = SWAPs then
+    # reverse of (H + CR cascade) with negated rotation angles.
+
+    # 1) SWAPs first
+    for i in range(n_counting // 2):
+        circ.swap(counting[i], counting[n_counting - 1 - i])
+
+    # 2) Reverse cascade: for i from n-1 down to 0, apply CR^dagger with all j>i,
+    #    then H on qubit i.
     for i in range(n_counting - 1, -1, -1):
         for j in range(n_counting - 1, i, -1):
             angle = -np.pi / 2 ** (j - i)
             _cphase(circ, counting[j], counting[i], angle)
         circ.h(counting[i])
 
-    # Bit-reversal swaps LAST
-    for i in range(n_counting // 2):
-        circ.swap(counting[i], counting[n_counting - 1 - i])
-
     return circ
 
 
 # ── Log helper ─────────────────────────────────────────────────────────────────
 def append_log(record: dict):
-    """Append one JSON record (one line) to job_log.txt."""
     os.makedirs(JOB_RESULTS_DIR, exist_ok=True)
     with open(LOG_FILE, "a") as f:
         f.write(json.dumps(record) + "\n")
@@ -180,9 +165,7 @@ def main():
     print(f"\nCompany : {company}  ({len(device_list)} device(s))")
     print(f"Querying device status...\n")
 
-    # ── Phase 1: discover devices ──────────────────────────────────────────────
-    online_devices = []   # list of (name, arn, max_qubits, AwsDevice)
-
+    online_devices = []
     for dev_info in device_list:
         name = dev_info["name"]
         arn  = dev_info["arn"]
@@ -205,7 +188,6 @@ def main():
         print("\nNo online devices found. Exiting.")
         sys.exit(0)
 
-    # ── Phase 2: select device ─────────────────────────────────────────────────
     print(f"\nOnline devices:")
     for idx, (name, arn, max_qubits, _) in enumerate(online_devices, start=1):
         print(f"  [{idx}] {name}  ({max_qubits} qubits)")
@@ -224,7 +206,6 @@ def main():
     print(f"Note     : 1 qubit is reserved as the QPE target; "
           f"n_counting = n_total - 1.")
 
-    # ── Phase 3: select qubit count ────────────────────────────────────────────
     while True:
         try:
             n_total = int(input(f"Enter number of qubits to use [2-{sel_max_qubits}]: "))
@@ -236,7 +217,6 @@ def main():
 
     n_counting = n_total - 1
 
-    # ── Phase 4: submit ────────────────────────────────────────────────────────
     print(f"\nSubmitting QPE circuit:")
     print(f"  Device     : {sel_name}")
     print(f"  n_total    : {n_total}  (n_counting={n_counting}, target=1)")
