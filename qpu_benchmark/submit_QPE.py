@@ -5,9 +5,12 @@ submit_QPE.py
 Usage: python submit_QPE.py <company>
   company: ionq | aqt | rigetti | iqm
 
-For each device belonging to the chosen company, submits two QPE jobs:
-  - n_total = max_qubits // 2   (half qubits)
-  - n_total = max_qubits        (full qubits)
+Interactive flow:
+  1. Lists all devices for the chosen company with status and qubit count.
+  2. Prompts user to select an ONLINE device.
+  3. Prompts user to enter the number of qubits (n_total; 1 qubit is reserved
+     as the target, so n_counting = n_total - 1).
+  4. Submits one QPE job and logs the result.
 
 Quantum Phase Estimation circuit:
   Unitary  : T gate  (U = T, phase φ = 1/8, eigenstate |1⟩)
@@ -22,7 +25,7 @@ Quantum Phase Estimation circuit:
     5. Measure all (counting qubits encode the estimated phase)
 
   All gates decomposed into H, X, CNOT, Rz — supported on all Braket QPUs.
-  CPhaseShift(θ) decomposition (same as submit_QFT.py):
+  CPhaseShift(θ) decomposition:
     Rz(θ/2)  on control
     CNOT(control, target)
     Rz(-θ/2) on target
@@ -105,7 +108,6 @@ def _cphase(circ: Circuit, control: int, target: int, angle: float):
     """
     Decomposed CPhaseShift(angle) using CNOT and Rz only.
     Applies phase e^(i*angle) when both qubits are |1⟩.
-    Same decomposition as submit_QFT.py.
     """
     circ.rz(control, angle / 2)
     circ.cnot(control, target)
@@ -121,10 +123,6 @@ def build_qpe(n_counting: int) -> Circuit:
     Layout:
       qubits 0 .. n_counting-1  : counting register
       qubit  n_counting          : target (eigenstate qubit)
-
-    The ideal measurement outcome on counting qubits is the binary
-    representation of round(2^n_counting * φ) = 2^(n_counting - 3)
-    for n_counting >= 3.
     """
     target   = n_counting
     counting = list(range(n_counting))
@@ -139,7 +137,6 @@ def build_qpe(n_counting: int) -> Circuit:
         circ.h(k)
 
     # Step 3 — Controlled-T^(2^k) for each counting qubit k
-    # T^(2^k) has phase e^(i * 2^k * π/4); wraps mod 2π for large k.
     for k in range(n_counting):
         angle = (np.pi / 4) * (2 ** k) % (2 * np.pi)
         _cphase(circ, counting[k], target, angle)
@@ -179,91 +176,105 @@ def main():
         print(f"Unknown company '{company}'. Choose from: {', '.join(COMPANY_DEVICES)}")
         sys.exit(1)
 
-    devices = COMPANY_DEVICES[company]
-    print(f"Company   : {company}  ({len(devices)} device(s))")
-    print(f"Unitary   : T gate  |  Phase target φ = {PHASE_TARGET} (= 1/8)")
-    total_submitted = 0
+    device_list = COMPANY_DEVICES[company]
+    print(f"\nCompany : {company}  ({len(device_list)} device(s))")
+    print(f"Querying device status...\n")
 
-    for dev_info in devices:
+    # ── Phase 1: discover devices ──────────────────────────────────────────────
+    online_devices = []   # list of (name, arn, max_qubits, AwsDevice)
+
+    for dev_info in device_list:
         name = dev_info["name"]
         arn  = dev_info["arn"]
-        print(f"\n{'─'*60}")
-        print(f"Device : {name}")
-        print(f"ARN    : {arn}")
-
-        # Query device capabilities
         try:
-            device = AwsDevice(arn)
-            caps   = device.properties
-            if not hasattr(caps, "paradigm"):
-                print("  Could not determine qubit count — skipping.")
-                continue
-            max_qubits = caps.paradigm.qubitCount
+            device     = AwsDevice(arn)
+            caps       = device.properties
+            max_qubits = caps.paradigm.qubitCount if hasattr(caps, "paradigm") else None
             status     = device.status
-            print(f"  Status     : {status}")
-            print(f"  Max qubits : {max_qubits}")
         except Exception as e:
-            print(f"  ERROR [{name}] querying device: {e}")
+            print(f"  [{name}] ERROR querying device: {e}")
             continue
 
-        if max_qubits < 2:
-            print(f"  Skipping — QPE requires at least 2 qubits.")
-            continue
+        qubit_str = f"{max_qubits} qubits" if max_qubits is not None else "? qubits"
+        print(f"  {name:<30} | {status:<8} | {qubit_str}")
 
-        # Submit half-qubit and full-qubit jobs
-        for n_total in [max_qubits // 2, max_qubits]:
-            # QPE uses n_counting + 1 qubits total; floor to even so the
-            # circuit never exceeds the device limit when max_qubits is odd.
-            if n_total % 2 == 1:
-                n_total -= 1
-            if n_total < 2:
-                continue
-            n_counting = n_total - 1
-            label = "half" if n_total == max_qubits // 2 else "full"
-            print(f"\n  [{label}] Submitting QPE n_total={n_total} "
-                  f"(counting={n_counting}, target=1) ...")
+        if status == "ONLINE" and max_qubits is not None:
+            online_devices.append((name, arn, max_qubits, device))
 
-            circ = build_qpe(n_counting)
+    if not online_devices:
+        print("\nNo online devices found. Exiting.")
+        sys.exit(0)
 
-            submitted_at = datetime.now(timezone.utc).isoformat()
-            try:
-                s3_bucket = get_default_bucket()
-                task    = device.run(
-                    circ,
-                    shots=SHOTS,
-                    s3_destination_folder=(s3_bucket, f"{S3_PREFIX}/{name}"),
-                )
-                task_id = task.id
-                print(f"  ✓ Task ID      : {task_id}")
-                print(f"    Submitted at : {submitted_at}")
-                print(f"    Qubits       : {n_total} total  |  Shots: {SHOTS}  |  Type: QPE")
-                print(f"    Phase target : φ = {PHASE_TARGET}  (T gate, ideal outcome: "
-                      f"{round(2**n_counting * PHASE_TARGET)})")
+    # ── Phase 2: select device ─────────────────────────────────────────────────
+    print(f"\nOnline devices:")
+    for idx, (name, arn, max_qubits, _) in enumerate(online_devices, start=1):
+        print(f"  [{idx}] {name}  ({max_qubits} qubits)")
 
-                record = {
-                    "task_id":      task_id,
-                    "submitted_at": submitted_at,
-                    "device":       name,
-                    "device_arn":   arn,
-                    "circuit_type": "QPE",
-                    "n_qubits":     n_total,
-                    "n_counting":   n_counting,
-                    "n_shots":      SHOTS,
-                    "phase_target": PHASE_TARGET,
-                }
-                append_log(record)
-                print(f"    Logged       → {LOG_FILE}")
-                total_submitted += 1
+    while True:
+        try:
+            choice = int(input(f"\nSelect device [1-{len(online_devices)}]: "))
+            if 1 <= choice <= len(online_devices):
+                break
+            print(f"  Please enter a number between 1 and {len(online_devices)}.")
+        except ValueError:
+            print("  Invalid input — enter an integer.")
 
-            except Exception as e:
-                print(f"  ✗ ERROR [{name}  n_total={n_total}  QPE] submission failed: {e}")
+    sel_name, sel_arn, sel_max_qubits, sel_device = online_devices[choice - 1]
+    print(f"\nSelected : {sel_name}  (max {sel_max_qubits} qubits)")
+    print(f"Note     : 1 qubit is reserved as the QPE target; "
+          f"n_counting = n_total - 1.")
 
-    print(f"\n{'='*60}")
-    print(f"Total tasks submitted : {total_submitted}")
-    print(f"Job log               : {LOG_FILE}")
-    print(f"\nNote: Ideal counting-register outcome is "
-          f"round(2^n_counting * {PHASE_TARGET}) = 2^(n_counting-3).")
-    print(f"      Retrieve results and check peak-bin accuracy in checkRetieve.py.")
+    # ── Phase 3: select qubit count ────────────────────────────────────────────
+    while True:
+        try:
+            n_total = int(input(f"Enter number of qubits to use [2-{sel_max_qubits}]: "))
+            if 2 <= n_total <= sel_max_qubits:
+                break
+            print(f"  Must be between 2 and {sel_max_qubits}.")
+        except ValueError:
+            print("  Invalid input — enter an integer.")
+
+    n_counting = n_total - 1
+
+    # ── Phase 4: submit ────────────────────────────────────────────────────────
+    print(f"\nSubmitting QPE circuit:")
+    print(f"  Device     : {sel_name}")
+    print(f"  n_total    : {n_total}  (n_counting={n_counting}, target=1)")
+    print(f"  Shots      : {SHOTS}")
+    print(f"  Phase φ    : {PHASE_TARGET}  (T gate, ideal bin: "
+          f"{round(2**n_counting * PHASE_TARGET)})")
+
+    circ = build_qpe(n_counting)
+    submitted_at = datetime.now(timezone.utc).isoformat()
+
+    try:
+        s3_bucket = get_default_bucket()
+        task      = sel_device.run(
+            circ,
+            shots=SHOTS,
+            s3_destination_folder=(s3_bucket, f"{S3_PREFIX}/{sel_name}"),
+        )
+        task_id = task.id
+        print(f"\n  ✓ Task ID      : {task_id}")
+        print(f"    Submitted at : {submitted_at}")
+
+        record = {
+            "task_id":      task_id,
+            "submitted_at": submitted_at,
+            "device":       sel_name,
+            "device_arn":   sel_arn,
+            "circuit_type": "QPE",
+            "n_qubits":     n_total,
+            "n_counting":   n_counting,
+            "n_shots":      SHOTS,
+            "phase_target": PHASE_TARGET,
+        }
+        append_log(record)
+        print(f"    Logged       → {LOG_FILE}")
+
+    except Exception as e:
+        print(f"\n  ✗ ERROR submission failed: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
