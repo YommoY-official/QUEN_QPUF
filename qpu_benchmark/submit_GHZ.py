@@ -13,7 +13,7 @@ GHZ state: (|00...0⟩ + |11...1⟩) / sqrt(2)
 
 Verification is classical (post-measurement):
   ideal_fraction = fraction of shots that are |00...0⟩ or |11...1⟩
-  (computed in checkRetieve.py when results are retrieved)
+  (computed in checkRetrieve.py when results are retrieved)
 
 Appends one JSON record per submitted task to:
   qpu_benchmark/job_results/job_log.txt
@@ -180,7 +180,7 @@ def main():
     print(f"Total tasks submitted : {total_submitted}")
     print(f"Job log               : {LOG_FILE}")
     print(f"\nNote: GHZ verification (ideal fraction) is computed automatically")
-    print(f"      by checkRetieve.py when results are retrieved.")
+    print(f"      by checkRetrieve.py when results are retrieved.")
 
 
 if __name__ == "__main__":

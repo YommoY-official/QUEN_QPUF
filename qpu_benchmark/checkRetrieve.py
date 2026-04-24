@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-checkRetieve.py
+checkRetrieve.py
 ===============
 Run on the DCV where AWS credentials are configured.
 
