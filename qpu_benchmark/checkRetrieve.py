@@ -92,17 +92,25 @@ def main():
     print(f"Found {len(records)} job(s) in {LOG_FILE}")
     print(f"Output directory : {JOB_RESULTS_DIR}\n")
 
-    saved = skipped = pending = errors = 0
+    saved = skipped = pending = errors = failed = 0
 
     for i, rec in enumerate(records):
         task_id  = rec["task_id"]
         uuid     = task_uuid(task_id)
         out_path = os.path.join(JOB_RESULTS_DIR, f"{uuid}.json")
 
-        # Skip silently if already retrieved
+        # Skip silently if already retrieved (or already marked terminal-failed)
         if os.path.exists(out_path):
             skipped += 1
-            saved   += 1
+            try:
+                with open(out_path) as fh:
+                    prior_status = json.load(fh).get("status")
+            except Exception:
+                prior_status = None
+            if prior_status in ("FAILED", "CANCELLED"):
+                failed += 1
+            else:
+                saved += 1
             continue
 
         print(f"[{i+1}/{len(records)}] {uuid}")
@@ -120,6 +128,22 @@ def main():
             continue
 
         print(f"  Status    : {status}")
+
+        if status in ("FAILED", "CANCELLED"):
+            marker = {
+                "task_id":      task_id,
+                "status":       status,
+                "submitted_at": rec["submitted_at"],
+                "device":       rec["device"],
+                "device_arn":   rec["device_arn"],
+                "circuit_type": rec["circuit_type"],
+                "n_qubits":     rec["n_qubits"],
+            }
+            with open(out_path, "w") as f:
+                json.dump(marker, f, indent=2)
+            print(f"  Marked terminal {status} → {out_path}\n")
+            failed += 1
+            continue
 
         if status != "COMPLETED":
             print(f"  Not yet completed — skipping.\n")
@@ -214,7 +238,8 @@ def main():
         saved += 1
 
     print(f"{'='*60}")
-    print(f"Summary : {saved} saved  |  {pending} pending  |  {errors} errors")
+    print(f"Summary : {saved} saved  |  {pending} pending  |  "
+          f"{failed} failed  |  {errors} errors")
     print(f"Results : {JOB_RESULTS_DIR}/")
 
 
