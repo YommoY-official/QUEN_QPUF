@@ -1,0 +1,9 @@
+{
+  "task_id": "arn:aws:braket:eu-north-1:767397707562:quantum-task/36a917a1-1641-4343-883e-2f6e7c4dbcb4",
+  "status": "FAILED",
+  "submitted_at": "2026-04-10T11:00:36.124842+00:00",
+  "device": "Emerald",
+  "device_arn": "arn:aws:braket:eu-north-1::device/qpu/iqm/Emerald",
+  "circuit_type": "QFT",
+  "n_qubits": 27
+}

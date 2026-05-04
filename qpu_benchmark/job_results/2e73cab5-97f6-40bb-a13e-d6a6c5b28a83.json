@@ -1,0 +1,9 @@
+{
+  "task_id": "arn:aws:braket:us-west-1:767397707562:quantum-task/2e73cab5-97f6-40bb-a13e-d6a6c5b28a83",
+  "status": "FAILED",
+  "submitted_at": "2026-04-24T06:55:48.301993+00:00",
+  "device": "Cepheus-1-108Q",
+  "device_arn": "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
+  "circuit_type": "QPE",
+  "n_qubits": 54
+}
