@@ -1,0 +1,61 @@
+AWS Braket QPU reference
+========================
+Drop-in values for DEVICE_NAME / DEVICE_ARN in submit_QPUF_ntarg.py.
+Qubit counts are nominal — query device.properties.paradigm.qubitCount at
+runtime for the authoritative number.
+
+IonQ (trapped ion, all-to-all, MCM + reset supported on Forte-1)
+----------------------------------------------------------------
+  Forte-1                36 qubits   us-east-1
+    arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1
+
+  Forte-Enterprise-1     36 qubits   us-east-1
+    arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1
+
+  Aria-1                 25 qubits   us-east-1
+    arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1
+
+  Aria-2                 25 qubits   us-east-1
+    arn:aws:braket:us-east-1::device/qpu/ionq/Aria-2
+
+
+IQM (superconducting, fixed lattice)
+------------------------------------
+  Garnet                 20 qubits   eu-north-1
+    arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet
+
+  Emerald                54 qubits   eu-north-1
+    arn:aws:braket:eu-north-1::device/qpu/iqm/Emerald
+
+
+Rigetti (superconducting, fixed lattice)
+----------------------------------------
+  Ankaa-3                82 qubits   us-west-1
+    arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3
+
+  Cepheus-1-108Q        108 qubits   us-west-1
+    arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q
+
+
+AQT (trapped ion)
+-----------------
+  Ibex-Q1                ?  qubits   eu-north-1
+    arn:aws:braket:eu-north-1::device/qpu/aqt/Ibex-Q1
+
+
+Local simulators (no submission, useful for testing)
+----------------------------------------------------
+  braket_sv              full state vector
+  braket_dm              density matrix
+  braket_ahs             analog Hamiltonian simulator
+
+
+Notes
+-----
+- Region must match the ARN; the qiskit-braket-provider picks this up from
+  the ARN, but boto3 / AwsDevice calls need the right AWS_REGION.
+- MCM + reset: confirmed on IonQ Forte-1 via Braket Direct. Other devices
+  may transpile reset to measure + conditional-X, or reject it — check
+  before relying on register reuse.
+- All-to-all connectivity: IonQ and AQT. Rigetti and IQM are fixed-lattice,
+  so transpile will insert SWAPs.
