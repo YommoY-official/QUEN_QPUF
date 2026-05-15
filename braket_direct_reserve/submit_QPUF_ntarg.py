@@ -73,6 +73,18 @@ def haar_random_unitary(d: int, rng: np.random.Generator | None = None) -> np.nd
     return Q * Lambda  # broadcast: multiplies each column of Q by Lambda[j]
 
 
+def _stable_matrix_power(U: np.ndarray, power: int) -> np.ndarray:
+    """
+    U**power, re-projected onto the nearest unitary via SVD (polar
+    decomposition). Repeated squaring in float64 squares the error each
+    step, so at N_PREC=32 the raw U^{2^31} drifts ~1e-6 from unitary and
+    Qiskit's UnitaryGate unitarity check rejects it.
+    """
+    M = np.linalg.matrix_power(U, power)
+    W, _, Vh = np.linalg.svd(M)
+    return W @ Vh
+
+
 # ── QPE stage builder ──────────────────────────────────────────────────────────
 
 def build_qpe_stage(n_prec: int, U: np.ndarray) -> QuantumCircuit:
@@ -97,7 +109,7 @@ def build_qpe_stage(n_prec: int, U: np.ndarray) -> QuantumCircuit:
     # This puts the most significant bit at qubit 0 of the precision register.
     for k in range(n_prec):
         power = 2 ** (n_prec - 1 - k)
-        U_pow = np.linalg.matrix_power(U, power)
+        U_pow = _stable_matrix_power(U, power)
         cU = UnitaryGate(U_pow, label=f"U^{power}").control(1)
         # Order: [control, target_0, target_1, ...]
         qc.append(cU, [prec[k]] + targ)
