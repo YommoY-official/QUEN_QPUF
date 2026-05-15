@@ -29,11 +29,11 @@ Braket Direct.
 """
 
 # ── CONFIGURATION ──────────────────────────────────────────────────────────────
-DEVICE_NAME = "Forte-1"
-DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1"
+DEVICE_NAME = "Forte-Enterprise-1"
+DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
 N_PREC      = 32            # precision qubits (shared across both stages)
-N_TARG      = 3             # target qubits — Haar-random unitary acts on these
-N_SHOTS     = 100
+N_TARG      = 2             # target qubits — Haar-random unitary acts on these
+N_SHOTS     = 10000
 SEED        = 100           # RNG seed for the Haar-random unitary
 TARGET_INIT_SEED = 99       # RNG seed for the target-state initialisation
 # ──────────────────────────────────────────────────────────────────────────────
