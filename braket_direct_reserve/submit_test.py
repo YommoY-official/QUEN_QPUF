@@ -35,6 +35,7 @@ from submit_QPUF_ntarg import (
     DEVICE_ARN,
     N_PREC           as PROD_N_PREC,
     N_TARG           as PROD_N_TARG,
+    N_SHOTS          as PROD_N_SHOTS,
     SEED             as PROD_SEED,
     TARGET_INIT_SEED as PROD_INIT_SEED,
     haar_random_unitary,
@@ -115,6 +116,8 @@ def production_cost_preview():
     qc_hw = transpile(qc, basis_gates=ionq_basis, optimization_level=1)
     print(f"Transpiled depth : {qc_hw.depth()}")
     print(f"Transpiled gates : {qc_hw.size()}")
+    print("\n--- Total number of Gates ---")
+    print(f"Total gates : {qc_hw.size() * PROD_N_SHOTS}")
 
 
 def small_scale_smoke_test():
