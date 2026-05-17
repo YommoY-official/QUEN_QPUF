@@ -93,11 +93,17 @@ def production_cost_preview():
 
     backend = _resolve_backend()
 
+    # IonQ Forte's qiskit target has no equivalence path from UnitaryGate to
+    # gpi/gpi2/rzz and doesn't advertise 'reset'. Transpile to rz/rx/rxx
+    # (rxx ≈ IonQ MS), so gate/depth counts roughly match native cost; Braket
+    # Direct's server-side compiler maps to gpi/gpi2/rzz at submission time.
+    ionq_basis = ['rz', 'rx', 'rxx', 'measure', 'reset']
+
     print("\n--- One controlled-Haar-U probe ---")
     probe = QuantumCircuit(PROD_N_TARG + 1, name="cU_probe")
     cU = UnitaryGate(U, label="U").control(1)
     probe.append(cU, list(range(PROD_N_TARG + 1)))
-    probe_hw = transpile(probe, backend=backend, optimization_level=1)
+    probe_hw = transpile(probe, basis_gates=ionq_basis, optimization_level=1)
     per_U_gates = probe_hw.size()
     per_U_depth = probe_hw.depth()
     print(f"Native gates : {per_U_gates}")
@@ -106,7 +112,7 @@ def production_cost_preview():
           f"~{per_U_gates * PROD_N_PREC} gates ({PROD_N_PREC} ctrl-U gates per stage)")
 
     print("\n--- Full production circuit transpile (this may take a minute) ---")
-    qc_hw = transpile(qc, backend=backend, optimization_level=1)
+    qc_hw = transpile(qc, basis_gates=ionq_basis, optimization_level=1)
     print(f"Transpiled depth : {qc_hw.depth()}")
     print(f"Transpiled gates : {qc_hw.size()}")
 

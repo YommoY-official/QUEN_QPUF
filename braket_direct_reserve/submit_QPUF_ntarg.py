@@ -31,7 +31,7 @@ Braket Direct.
 # ── CONFIGURATION ──────────────────────────────────────────────────────────────
 DEVICE_NAME = "Forte-Enterprise-1"
 DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
-N_PREC      = 32            # precision qubits (shared across both stages)
+N_PREC      = 10            # precision qubits (shared across both stages)
 N_TARG      = 2             # target qubits — Haar-random unitary acts on these
 N_SHOTS     = 10000
 SEED        = 100           # RNG seed for the Haar-random unitary
@@ -250,8 +250,17 @@ def main():
           f"(circuit uses {qc.num_qubits})")
 
     # ── Transpile ──────────────────────────────────────────────────────────────
+    # Don't pass backend=backend: IonQ Forte's qiskit target advertises only
+    # {gpi, gpi2, rzz, measure, ...} and has no equivalence path from
+    # UnitaryGate/QFT decompositions, plus 'reset' isn't in the target. We
+    # transpile to rz/rx/rxx (≈ IonQ MS), and Braket Direct's server-side
+    # compiler maps these to native gpi/gpi2/rzz at submission time.
     print(f"\nTranspiling for {backend.name} ...")
-    qc_hw = transpile(qc, backend=backend, optimization_level=1)
+    qc_hw = transpile(
+        qc,
+        basis_gates=['rz', 'rx', 'rxx', 'measure', 'reset'],
+        optimization_level=1,
+    )
     n_gates = qc_hw.size()
     print(f"Transpiled depth : {qc_hw.depth()}")
     print(f"Transpiled gates : {n_gates}")
