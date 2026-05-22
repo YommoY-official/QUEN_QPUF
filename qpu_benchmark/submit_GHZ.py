@@ -65,10 +65,6 @@ COMPANY_DEVICES = {
     ],
     "rigetti": [
         {
-            "name": "Ankaa-3",
-            "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3",
-        },
-        {
             "name": "Cepheus-1-108Q",
             "arn":  "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
         },

@@ -19,7 +19,6 @@ QPU_ARNS = [
     "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1",
     "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1",
     "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet",      # IQM 20q
-    "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3",  # Rigetti 84q
 ]
 
 # ── Circuit builders ──────────────────────────────────────────────────────────
