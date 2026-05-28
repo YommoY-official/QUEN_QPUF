@@ -16,11 +16,24 @@ ones this project submitted.
 Under a Braket Direct reservation, tasks generally sit in "RUNNING" briefly
 and then move to "COMPLETED" — so a single pass at the end of the
 reservation window is usually sufficient.
+
+Timing captured per job:
+  - datetime           : submission timestamp (from job_log.txt)
+  - completed_at       : AWS task endedAt
+  - task_time_seconds  : endedAt − createdAt (AWS-side task lifetime; under
+                         a reservation this is ≈ actual run time because the
+                         queue is empty)
+  - wall_time_seconds  : endedAt − datetime  (total real-world wait,
+                         including our local submit round trip)
+  - qpu_time_seconds   : device-reported QPU execution time, from
+                         result.additional_metadata.ionqMetadata
+                         (None if the device doesn't report it)
 """
 
 import json
 import os
 import sys
+from datetime import datetime, timezone
 
 from braket.aws import AwsQuantumTask
 
@@ -33,8 +46,57 @@ def task_uuid(job_id: str) -> str:
     return job_id.split("/")[-1]
 
 
+def extract_qpu_time(result) -> float | None:
+    """
+    Device-reported QPU execution time, in seconds.
+
+    IonQ exposes this as additional_metadata.ionqMetadata.executionDuration
+    (units: seconds). Other vendors use analogous fields; we probe the
+    common ones and return the first hit, or None if nothing is reported.
+    """
+    addl = getattr(result, "additional_metadata", None)
+    if addl is None:
+        return None
+    for attr in ("ionqMetadata", "rigettiMetadata", "iqmMetadata"):
+        vendor_meta = getattr(addl, attr, None)
+        if vendor_meta is not None:
+            for field in ("executionDuration", "execution_duration",
+                          "qpuExecutionDuration", "qpu_execution_duration"):
+                val = getattr(vendor_meta, field, None)
+                if val is not None:
+                    return float(val)
+    return None
+
+
+def serialize_additional_metadata(result) -> dict | None:
+    """
+    Full result.additional_metadata blob as a JSON-friendly dict.
+
+    This is where IonQ reports its server-side compilation results — native
+    gate counts, the compiled program, error-mitigation settings, and
+    executionDuration. Round-tripping through pydantic's JSON serializer
+    (rather than .dict()/.model_dump()) guarantees the output is safe to
+    json.dump later (datetimes etc. come out as ISO strings).
+    """
+    addl = getattr(result, "additional_metadata", None)
+    if addl is None:
+        return None
+    for method in ("model_dump_json", "json"):
+        if hasattr(addl, method):
+            try:
+                return json.loads(getattr(addl, method)())
+            except Exception:
+                continue
+    return None
+
+
 def retrieve_counts(job_id: str, device_arn: str) -> dict | None:
-    """Pull qiskit-format measurement counts for a completed task."""
+    """
+    Pull qiskit-format measurement counts. Using the qiskit wrapper (rather
+    than result.measurement_counts directly) preserves the c1/c2 classical-
+    register split in the bitstring keys, which the analysis notebook
+    relies on.
+    """
     try:
         from qiskit_braket_provider import BraketProvider
     except ImportError:
@@ -96,7 +158,8 @@ def main():
 
         # Query AWS for the current task status.
         try:
-            status = AwsQuantumTask(arn=job_id).state()
+            aws_task = AwsQuantumTask(arn=job_id)
+            status   = aws_task.state()
         except Exception as e:
             print(f"  ERROR checking status: {e}\n")
             continue
@@ -118,28 +181,82 @@ def main():
         n_shots_actual = sum(counts.values())
         print(f"  Retrieved {n_shots_actual} shots, {len(counts)} unique outcomes.")
 
+        # ── Timing ───────────────────────────────────────────────────────────
+        completed_at      = None
+        task_time_seconds = None
+        wall_time_seconds = None
+        qpu_time_seconds  = None
+
+        try:
+            meta       = aws_task.metadata()
+            created_at = meta.get("createdAt")   # tz-aware datetime
+            ended_at   = meta.get("endedAt")      # tz-aware datetime
+
+            if ended_at:
+                completed_at = ended_at.isoformat()
+
+            if created_at and ended_at:
+                task_time_seconds = (ended_at - created_at).total_seconds()
+
+            submitted_dt = datetime.fromisoformat(rec["datetime"])
+            if submitted_dt.tzinfo is None:
+                submitted_dt = submitted_dt.replace(tzinfo=timezone.utc)
+            if ended_at:
+                wall_time_seconds = (ended_at - submitted_dt).total_seconds()
+
+        except Exception as e:
+            print(f"  WARNING: could not extract timing metadata: {e}")
+
+        # Device-reported QPU execution time AND the full IonQ-side metadata
+        # blob (native gate counts, compiled program, error mitigation, ...).
+        # Second result() call: cheap — result JSON is already in S3 from the
+        # qiskit retrieval above.
+        additional_metadata = None
+        try:
+            braket_result       = aws_task.result()
+            qpu_time_seconds    = extract_qpu_time(braket_result)
+            additional_metadata = serialize_additional_metadata(braket_result)
+        except Exception as e:
+            print(f"  WARNING: could not extract additional_metadata: {e}")
+
         # Self-contained output: everything the analysis notebook needs to
         # interpret the run, including the Haar unitary used.
         payload = {
-            "job_id":           job_id,
-            "datetime":         rec["datetime"],
-            "qpu":              rec["qpu"],
-            "device_arn":       rec["device_arn"],
-            "circuit_type":     rec.get("circuit_type"),
-            "n_prec":           rec["n_prec"],
-            "n_targ":           rec.get("n_targ"),
-            "n_shots":          n_shots_actual,
+            "job_id":            job_id,
+            "datetime":          rec["datetime"],
+            "completed_at":      completed_at,
+            "task_time_seconds": task_time_seconds,
+            "wall_time_seconds": wall_time_seconds,
+            "qpu_time_seconds":  qpu_time_seconds,
+            "qpu":               rec["qpu"],
+            "device_arn":        rec["device_arn"],
+            "circuit_type":      rec.get("circuit_type"),
+            "n_prec":            rec["n_prec"],
+            "n_targ":            rec.get("n_targ"),
+            "n_shots":           n_shots_actual,
             "n_shots_requested": rec.get("n_shots_requested", rec["n_shots"]),
-            "n_gates":          rec.get("n_gates"),
-            "seed":             rec.get("seed"),
-            "target_init_seed": rec.get("target_init_seed"),
-            "unitary":          rec.get("unitary"),
-            "counts":           counts,
+            "n_gates":           rec.get("n_gates"),
+            "seed":              rec.get("seed"),
+            "target_init_seed":  rec.get("target_init_seed"),
+            "unitary":           rec.get("unitary"),
+            "counts":            counts,
+            "additional_metadata": additional_metadata,
         }
 
         with open(out_path, "w") as f:
             json.dump(payload, f, indent=2)
 
+        if task_time_seconds is not None:
+            print(f"  Task time     : {task_time_seconds:.2f} s  "
+                  f"(≈ run time under reservation)")
+        if wall_time_seconds is not None:
+            print(f"  Wall time     : {wall_time_seconds:.2f} s")
+        if qpu_time_seconds is not None:
+            print(f"  QPU exec time : {qpu_time_seconds:.4f} s")
+        if isinstance(additional_metadata, dict):
+            ionq = additional_metadata.get("ionqMetadata")
+            if isinstance(ionq, dict) and ionq:
+                print(f"  IonQ metadata : {sorted(ionq.keys())}")
         print(f"  Saved → {out_path}\n")
         saved += 1
 

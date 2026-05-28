@@ -58,6 +58,52 @@ def extract_qpu_time(result) -> float | None:
     return None
 
 
+def extract_compiled_metrics(result) -> dict:
+    """
+    Extract compiled (native) circuit metrics from the result's additional
+    metadata — i.e. what actually ran on the QPU after the provider's compiler.
+
+    Returns {'compiled_gate_count': int|None, 'compiled_depth': int|None}.
+
+    Rigetti exposes both via nativeQuilMetadata (gateVolume, gateDepth).
+    IonQ exposes a native gate breakdown dict; we sum its values.
+    IQM does not standardize these fields.
+    """
+    out = {"compiled_gate_count": None, "compiled_depth": None}
+    addl = getattr(result, "additional_metadata", None)
+    if addl is None:
+        return out
+
+    rigetti = getattr(addl, "rigettiMetadata", None)
+    if rigetti is not None:
+        nqm = getattr(rigetti, "nativeQuilMetadata", None)
+        if nqm is not None:
+            gv = getattr(nqm, "gateVolume", None)
+            gd = getattr(nqm, "gateDepth", None)
+            if gv is not None:
+                out["compiled_gate_count"] = int(gv)
+            if gd is not None:
+                out["compiled_depth"] = int(gd)
+
+    ionq = getattr(addl, "ionqMetadata", None)
+    if ionq is not None:
+        for field in ("nativeGateCount", "gateCounts",
+                      "native_gate_count", "gate_counts"):
+            val = getattr(ionq, field, None)
+            if val is None:
+                continue
+            try:
+                if isinstance(val, dict):
+                    out["compiled_gate_count"] = int(sum(val.values()))
+                else:
+                    out["compiled_gate_count"] = int(val)
+            except Exception:
+                pass
+            break
+
+    return out
+
+
 def verify_ghz(counts: dict, n_qubits: int) -> dict:
     """
     Classical post-measurement GHZ verification.
@@ -196,6 +242,13 @@ def main():
         except Exception:
             pass
 
+        # Compiled (native) circuit metrics — what actually ran on the QPU
+        try:
+            compiled_metrics = extract_compiled_metrics(result)
+        except Exception as e:
+            print(f"  WARNING: could not extract compiled metrics: {e}")
+            compiled_metrics = {"compiled_gate_count": None, "compiled_depth": None}
+
         # ── GHZ verification ──────────────────────────────────────────────────
         ghz_verification = None
         if rec["circuit_type"] == "GHZ":
@@ -219,6 +272,8 @@ def main():
             "n_qubits":           rec["n_qubits"],
             "n_shots_requested":  rec["n_shots"],
             "n_shots_actual":     n_shots_actual,
+            "compiled_gate_count": compiled_metrics["compiled_gate_count"],
+            "compiled_depth":      compiled_metrics["compiled_depth"],
             "counts":             counts,
         }
         if ghz_verification is not None:
@@ -234,6 +289,10 @@ def main():
             print(f"  Wall time        : {wall_time_seconds:.1f} s")
         if qpu_time_seconds is not None:
             print(f"  QPU exec time    : {qpu_time_seconds:.4f} s")
+        if compiled_metrics["compiled_gate_count"] is not None:
+            print(f"  Compiled gates   : {compiled_metrics['compiled_gate_count']}")
+        if compiled_metrics["compiled_depth"] is not None:
+            print(f"  Compiled depth   : {compiled_metrics['compiled_depth']}")
         print(f"  Saved → {out_path}\n")
         saved += 1
 

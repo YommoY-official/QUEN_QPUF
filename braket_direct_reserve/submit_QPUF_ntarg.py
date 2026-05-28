@@ -265,18 +265,9 @@ def main():
     print(f"Transpiled depth : {qc_hw.depth()}")
     print(f"Transpiled gates : {n_gates}")
 
-    # ── Shots × gates budget (Braket limit is 1M for IonQ) ─────────────────────
-    GATE_SHOT_LIMIT = 1_000_000
-    n_shots = N_SHOTS
-    if n_gates * n_shots > GATE_SHOT_LIMIT:
-        n_shots = max(1, GATE_SHOT_LIMIT // n_gates)
-        print(f"\nWARNING: gates × shots would exceed {GATE_SHOT_LIMIT:,}.")
-        print(f"         Reducing shots: {N_SHOTS} → {n_shots}  "
-              f"({n_gates} gates × {n_shots} shots = {n_gates * n_shots:,})")
-
     # ── Submit ─────────────────────────────────────────────────────────────────
-    print(f"\nSubmitting {n_shots} shots to {DEVICE_NAME} ...")
-    job          = backend.run(qc_hw, shots=n_shots)
+    print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} ...")
+    job          = backend.run(qc_hw, shots=N_SHOTS)
     job_id       = job.job_id()
     submitted_at = datetime.now(timezone.utc).isoformat()
 
@@ -292,8 +283,7 @@ def main():
         "circuit_type":      "QPUF_ntarg",
         "n_prec":            N_PREC,
         "n_targ":            N_TARG,
-        "n_shots":           n_shots,
-        "n_shots_requested": N_SHOTS,
+        "n_shots":           N_SHOTS,
         "n_gates":           n_gates,
         "seed":              SEED,
         "target_init_seed":  TARGET_INIT_SEED,
