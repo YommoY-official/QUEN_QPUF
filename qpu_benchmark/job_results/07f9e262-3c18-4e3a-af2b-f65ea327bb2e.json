@@ -1,0 +1,9 @@
+{
+  "task_id": "arn:aws:braket:us-west-1:767397707562:quantum-task/07f9e262-3c18-4e3a-af2b-f65ea327bb2e",
+  "status": "FAILED",
+  "submitted_at": "2026-04-10T11:07:47.217923+00:00",
+  "device": "Ankaa-3",
+  "device_arn": "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3",
+  "circuit_type": "QFT",
+  "n_qubits": 82
+}
