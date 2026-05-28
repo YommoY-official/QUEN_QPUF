@@ -31,6 +31,7 @@ Braket Direct.
 # ── CONFIGURATION ──────────────────────────────────────────────────────────────
 DEVICE_NAME = "Forte-Enterprise-1"
 DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
+RES_ARN = "arn:aws:braket:us-east-1:767397707562:reservation/08fda262-2902-4a28-b88e-0969df8830c7"
 N_PREC      = 30            # precision qubits (shared across both stages)
 N_TARG      = 3             # target qubits — Haar-random unitary acts on these
 N_SHOTS     = 10000
@@ -197,6 +198,7 @@ def main():
         print(f"WARNING: |U†U − I|_max = {err:.2e} (expected ~1e-15)")
 
     print(f"QPU         : {DEVICE_NAME}  ({DEVICE_ARN})")
+    print(f"RES_ARN     : {RES_ARN}")
     print(f"N_PREC      : {N_PREC}")
     print(f"N_TARG      : {N_TARG}  (U is {d}×{d})")
     print(f"N_SHOTS     : {N_SHOTS}")
@@ -266,8 +268,10 @@ def main():
     print(f"Transpiled gates : {n_gates}")
 
     # ── Submit ─────────────────────────────────────────────────────────────────
-    print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} ...")
-    job          = backend.run(qc_hw, shots=N_SHOTS)
+    # reservation_arn routes the task through the Braket Direct reservation so
+    # it bills against the reserved window instead of on-demand QPU time.
+    print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} under reservation {RES_ARN} ...")
+    job          = backend.run(qc_hw, shots=N_SHOTS, reservation_arn=RES_ARN)
     job_id       = job.job_id()
     submitted_at = datetime.now(timezone.utc).isoformat()
 
@@ -280,6 +284,7 @@ def main():
         "datetime":          submitted_at,
         "qpu":               DEVICE_NAME,
         "device_arn":        DEVICE_ARN,
+        "reservation_arn":   RES_ARN,
         "circuit_type":      "QPUF_ntarg",
         "n_prec":            N_PREC,
         "n_targ":            N_TARG,

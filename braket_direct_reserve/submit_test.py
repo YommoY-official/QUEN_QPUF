@@ -33,6 +33,7 @@ from qiskit.circuit.library import UnitaryGate
 from submit_QPUF_ntarg import (
     DEVICE_NAME,
     DEVICE_ARN,
+    RES_ARN,
     N_PREC           as PROD_N_PREC,
     N_TARG           as PROD_N_TARG,
     N_SHOTS          as PROD_N_SHOTS,
@@ -79,6 +80,7 @@ def production_cost_preview():
     print("PRODUCTION CIRCUIT COST PREVIEW (from submit_QPUF_ntarg.py config)")
     print("=" * 72)
     print(f"DEVICE      : {DEVICE_NAME}")
+    print(f"RES_ARN     : {RES_ARN}")
     print(f"N_PREC      : {PROD_N_PREC}")
     print(f"N_TARG      : {PROD_N_TARG}")
     print(f"Total qubits: {PROD_N_PREC + PROD_N_TARG}")
