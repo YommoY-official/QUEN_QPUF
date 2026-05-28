@@ -32,7 +32,7 @@ Braket Direct.
 DEVICE_NAME = "Forte-Enterprise-1"
 DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
 RES_ARN = "arn:aws:braket:us-east-1:767397707562:reservation/08fda262-2902-4a28-b88e-0969df8830c7"
-N_PREC      = 30            # precision qubits (shared across both stages)
+N_PREC      = 20            # precision qubits (shared across both stages)
 N_TARG      = 3             # target qubits — Haar-random unitary acts on these
 N_SHOTS     = 10000
 SEED        = 100           # RNG seed for the Haar-random unitary

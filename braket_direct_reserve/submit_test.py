@@ -109,17 +109,26 @@ def production_cost_preview():
     probe_hw = transpile(probe, basis_gates=ionq_basis, optimization_level=1)
     per_U_gates = probe_hw.size()
     per_U_depth = probe_hw.depth()
+    per_U_2q    = probe_hw.num_nonlocal_gates()
     print(f"Native gates : {per_U_gates}")
+    print(f"2-qubit gates: {per_U_2q}")
     print(f"Depth        : {per_U_depth}")
     print(f"Projected per-QPE-stage ctrl-U cost: "
-          f"~{per_U_gates * PROD_N_PREC} gates ({PROD_N_PREC} ctrl-U gates per stage)")
+          f"~{per_U_gates * PROD_N_PREC} gates "
+          f"(~{per_U_2q * PROD_N_PREC} 2-qubit gates) "
+          f"({PROD_N_PREC} ctrl-U gates per stage)")
 
     print("\n--- Full production circuit transpile (this may take a minute) ---")
     qc_hw = transpile(qc, basis_gates=ionq_basis, optimization_level=1)
-    print(f"Transpiled depth : {qc_hw.depth()}")
-    print(f"Transpiled gates : {qc_hw.size()}")
+    n_total = qc_hw.size()
+    n_2q    = qc_hw.num_nonlocal_gates()
+    print(f"Transpiled depth   : {qc_hw.depth()}")
+    print(f"Transpiled gates   : {n_total}")
+    print(f"2-qubit gates      : {n_2q}")
+    print(f"Op breakdown       : {dict(qc_hw.count_ops())}")
     print("\n--- Total number of Gates ---")
-    print(f"Total gates : {qc_hw.size() * PROD_N_SHOTS}")
+    print(f"Total gates        : {n_total * PROD_N_SHOTS}")
+    print(f"Total 2-qubit gates: {n_2q * PROD_N_SHOTS}")
 
 
 def small_scale_smoke_test():
