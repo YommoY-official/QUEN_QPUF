@@ -137,14 +137,17 @@ def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray,
     Registers:
       target[n_targ]  — Haar-random initial state (one RY+RZ per qubit)
       prec[n_prec]    — QPE ancillae, measured + reset between stages
-      c1, c2          — classical bits for stage 1 and stage 2 outcomes
+      c[2*n_prec]     — single classical register: bits [0..n_prec-1] hold
+                        stage-1 outcomes (low half of the bitstring),
+                        bits [n_prec..2*n_prec-1] hold stage-2 outcomes
+                        (high half). Braket's OpenQASM 3 parser allows only
+                        one classical bit register per program.
     """
     targ_reg = QuantumRegister(n_targ, "target")
     prec_reg = QuantumRegister(n_prec, "prec")
-    c1 = ClassicalRegister(n_prec, "c1")
-    c2 = ClassicalRegister(n_prec, "c2")
+    c        = ClassicalRegister(2 * n_prec, "c")
 
-    qc = QuantumCircuit(targ_reg, prec_reg, c1, c2)
+    qc = QuantumCircuit(targ_reg, prec_reg, c)
 
     # Target initialisation: one RY+RZ per qubit, seeded independently of U.
     init_rng = np.random.default_rng(seed=target_init_seed)
@@ -159,7 +162,7 @@ def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray,
     qc.append(qpe1, list(prec_reg) + list(targ_reg))
 
     # MCM and reset the precision register so it can be reused for stage 2.
-    qc.measure(prec_reg, c1)
+    qc.measure(prec_reg, [c[k] for k in range(n_prec)])
     for q in prec_reg:
         qc.reset(q)
 
@@ -167,7 +170,7 @@ def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray,
     qpe2 = build_qpe_stage(n_prec, U)
     qc.append(qpe2, list(prec_reg) + list(targ_reg))
 
-    qc.measure(prec_reg, c2)
+    qc.measure(prec_reg, [c[n_prec + k] for k in range(n_prec)])
 
     return qc
 
