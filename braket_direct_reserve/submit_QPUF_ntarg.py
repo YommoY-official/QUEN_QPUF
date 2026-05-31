@@ -131,46 +131,46 @@ def build_qpe_stage(n_prec: int, U: np.ndarray) -> QuantumCircuit:
 def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray,
                        target_init_seed: int) -> QuantumCircuit:
     """
-    Two-stage QPE QPUF with one shared precision register, reused across stages
-    via measure → reset.
+    Two-stage QPE QPUF on a single flat qubit/classical register pair.
 
-    Registers:
-      target[n_targ]  — Haar-random initial state (one RY+RZ per qubit)
-      prec[n_prec]    — QPE ancillae, measured + reset between stages
-      c[2*n_prec]     — single classical register: bits [0..n_prec-1] hold
-                        stage-1 outcomes (low half of the bitstring),
-                        bits [n_prec..2*n_prec-1] hold stage-2 outcomes
-                        (high half). Braket's OpenQASM 3 parser allows only
-                        one classical bit register per program.
+    Braket's OpenQASM 3 parser allows ONLY ONE quantum register and ONE
+    classical register per program. We flatten:
+        q[0 .. n_targ-1]                 → target qubits
+        q[n_targ .. n_targ+n_prec-1]     → precision qubits
+        c[0 .. n_prec-1]                 → stage-1 outcomes (low bits)
+        c[n_prec .. 2*n_prec-1]          → stage-2 outcomes (high bits)
     """
-    targ_reg = QuantumRegister(n_targ, "target")
-    prec_reg = QuantumRegister(n_prec, "prec")
+    n_total  = n_targ + n_prec
+    q        = QuantumRegister(n_total, "q")
     c        = ClassicalRegister(2 * n_prec, "c")
+    qc       = QuantumCircuit(q, c)
 
-    qc = QuantumCircuit(targ_reg, prec_reg, c)
+    targ_idx = list(range(0, n_targ))
+    prec_idx = list(range(n_targ, n_targ + n_prec))
 
     # Target initialisation: one RY+RZ per qubit, seeded independently of U.
     init_rng = np.random.default_rng(seed=target_init_seed)
-    for q in targ_reg:
+    for i in targ_idx:
         theta0 = init_rng.uniform(0, np.pi)
         phi0   = init_rng.uniform(0, 2 * np.pi)
-        qc.ry(theta0, q)
-        qc.rz(phi0, q)
+        qc.ry(theta0, q[i])
+        qc.rz(phi0,   q[i])
 
-    # Stage 1 QPE
+    # Stage 1 QPE  — prec first, to match build_qpe_stage's qubit layout
+    # [prec[0], ..., prec[n_prec-1], targ[0], ..., targ[n_targ-1]].
     qpe1 = build_qpe_stage(n_prec, U)
-    qc.append(qpe1, list(prec_reg) + list(targ_reg))
+    qc.append(qpe1, prec_idx + targ_idx)
 
-    # MCM and reset the precision register so it can be reused for stage 2.
-    qc.measure(prec_reg, [c[k] for k in range(n_prec)])
-    for q in prec_reg:
-        qc.reset(q)
+    # MCM + reset on the precision qubits so they can be reused for stage 2.
+    qc.measure([q[i] for i in prec_idx], [c[k] for k in range(n_prec)])
+    for i in prec_idx:
+        qc.reset(q[i])
 
     # Stage 2 QPE on the collapsed target, reusing the same prec qubits.
     qpe2 = build_qpe_stage(n_prec, U)
-    qc.append(qpe2, list(prec_reg) + list(targ_reg))
+    qc.append(qpe2, prec_idx + targ_idx)
 
-    qc.measure(prec_reg, [c[n_prec + k] for k in range(n_prec)])
+    qc.measure([q[i] for i in prec_idx], [c[n_prec + k] for k in range(n_prec)])
 
     return qc
 
@@ -269,6 +269,7 @@ def main():
     # Braket Direct accept `reset` at the QASM level.
     try:
         from braket.aws import AwsDevice, DirectReservation
+        from braket.experimental_capabilities import EnableExperimentalCapability
         from braket.ir.openqasm import Program as OpenQasmProgram
         from qiskit import qasm3
     except ImportError as e:
@@ -355,8 +356,12 @@ def main():
                             basis_gates=BRAKET_BUILTIN_GATES)
     qasm_src = _rewrite_qasm_for_braket(qasm_src)
 
+    # `reset` is rejected by Braket's default OpenQASM parser; opting in to
+    # experimental capabilities turns on the MCM+reset feature that Forte-1
+    # supports under Braket Direct.
     print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} under reservation {RES_ARN} ...")
-    with DirectReservation(device, reservation_arn=RES_ARN):
+    with DirectReservation(device, reservation_arn=RES_ARN), \
+         EnableExperimentalCapability():
         task = device.run(
             OpenQasmProgram(source=qasm_src),
             shots=N_SHOTS,
