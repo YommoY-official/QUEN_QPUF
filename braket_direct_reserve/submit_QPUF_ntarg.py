@@ -32,11 +32,17 @@ Braket Direct.
 DEVICE_NAME = "Forte-Enterprise-1"
 DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
 RES_ARN = "arn:aws:braket:us-east-1:767397707562:reservation/08fda262-2902-4a28-b88e-0969df8830c7"
-N_PREC      = 30            # precision qubits (shared across both stages)
-N_TARG      = 3             # target qubits — Haar-random unitary acts on these
-N_SHOTS     = 10000
+N_PREC      = 5          # precision qubits (shared across both stages)
+N_TARG      = 2          # target qubits — Haar-random unitary acts on these
+N_SHOTS     = 100
 SEED        = 100           # RNG seed for the Haar-random unitary
 TARGET_INIT_SEED = 99       # RNG seed for the target-state initialisation
+
+# IonQ Forte-1 gate-time model (used only for the wall-clock estimate)
+ONE_QUBIT_TIME_S = 130e-6           # per 1q native gate
+TWO_QUBIT_TIME_S = 970e-6           # per 2q native gate
+READOUT_TIME_S   = 150e-6 + 50e-6   # 200 µs per readout event
+STARTUP_TIME_S   = 0.5              # fixed per-task overhead
 # ──────────────────────────────────────────────────────────────────────────────
 
 import json
@@ -264,8 +270,28 @@ def main():
         optimization_level=1,
     )
     n_gates = qc_hw.size()
+    ops     = qc_hw.count_ops()
+    n_1q    = ops.get('rz', 0) + ops.get('rx', 0)
+    n_2q    = ops.get('rxx', 0)
+    n_meas  = ops.get('measure', 0)
     print(f"Transpiled depth : {qc_hw.depth()}")
     print(f"Transpiled gates : {n_gates}")
+    print(f"  1q gates (rz+rx) : {n_1q}")
+    print(f"  2q gates (rxx)   : {n_2q}")
+    print(f"  measurements     : {n_meas}")
+
+    # ── Wall-clock estimate (IonQ Forte-1 gate-time model) ────────────────────
+    # (a) literal — readout charged once per shot, as written in the formula
+    # (b) per-meas — readout charged per measurement event in the circuit
+    per_shot_gates    = n_1q * ONE_QUBIT_TIME_S + n_2q * TWO_QUBIT_TIME_S
+    t_est_literal_s   = STARTUP_TIME_S + N_SHOTS * (per_shot_gates + READOUT_TIME_S)
+    t_est_permeas_s   = STARTUP_TIME_S + N_SHOTS * (per_shot_gates + n_meas * READOUT_TIME_S)
+
+    def _fmt(t_s):
+        return f"{t_s:.1f} s  ({t_s/60:.2f} min, {t_s/3600:.3f} h)"
+
+    print(f"\nEstimated runtime (literal readout/shot)    : {_fmt(t_est_literal_s)}")
+    print(f"Estimated runtime (readout × n_measurements): {_fmt(t_est_permeas_s)}")
 
     # ── Submit ─────────────────────────────────────────────────────────────────
     # reservation_arn routes the task through the Braket Direct reservation so
@@ -280,19 +306,24 @@ def main():
     print(f"Timestamp : {submitted_at}")
 
     record = {
-        "job_id":            job_id,
-        "datetime":          submitted_at,
-        "qpu":               DEVICE_NAME,
-        "device_arn":        DEVICE_ARN,
-        "reservation_arn":   RES_ARN,
-        "circuit_type":      "QPUF_ntarg",
-        "n_prec":            N_PREC,
-        "n_targ":            N_TARG,
-        "n_shots":           N_SHOTS,
-        "n_gates":           n_gates,
-        "seed":              SEED,
-        "target_init_seed":  TARGET_INIT_SEED,
-        "unitary":           _encode_unitary(U),
+        "job_id":               job_id,
+        "datetime":             submitted_at,
+        "qpu":                  DEVICE_NAME,
+        "device_arn":           DEVICE_ARN,
+        "reservation_arn":      RES_ARN,
+        "circuit_type":         "QPUF_ntarg",
+        "n_prec":               N_PREC,
+        "n_targ":               N_TARG,
+        "n_shots":              N_SHOTS,
+        "n_gates":              n_gates,
+        "n_1q_gates":           n_1q,
+        "n_2q_gates":           n_2q,
+        "n_measurements":       n_meas,
+        "est_runtime_s_literal": t_est_literal_s,
+        "est_runtime_s_permeas": t_est_permeas_s,
+        "seed":                 SEED,
+        "target_init_seed":     TARGET_INIT_SEED,
+        "unitary":              _encode_unitary(U),
     }
     append_job_log(record)
 
