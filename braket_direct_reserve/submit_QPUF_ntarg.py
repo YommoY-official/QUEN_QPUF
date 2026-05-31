@@ -191,6 +191,47 @@ def _encode_unitary(U: np.ndarray) -> dict:
     }
 
 
+def _rewrite_qasm_for_braket(qasm: str) -> str:
+    """
+    Make qiskit's OpenQASM 3 output acceptable to AWS Braket.
+
+    Braket's parser accepts only its own built-in gates: no `include`
+    statements and no user-defined `gate` blocks. We:
+      1. Strip any `gate rxx(...) { ... }` definition (matched by brace
+         depth — robust to multi-line bodies).
+      2. Rename every `rxx(<angle>) ...` call site to `xx(<angle>) ...`
+         (Braket's native Ising-XX gate; matrix is identical to qiskit
+         RXX, so no parameter rescaling is needed).
+    """
+    import re
+
+    out_lines  = []
+    skip_until = -1
+    lines      = qasm.splitlines()
+    i          = 0
+    while i < len(lines):
+        line = lines[i]
+
+        # Drop "gate rxx(...) { ... }" block (balanced braces, any depth).
+        if re.match(r'\s*gate\s+rxx\b', line):
+            depth = line.count('{') - line.count('}')
+            i += 1
+            while i < len(lines) and depth > 0:
+                depth += lines[i].count('{') - lines[i].count('}')
+                i += 1
+            continue
+
+        # Rename call sites: `rxx(angle) q0, q1;` → `xx(angle) q0, q1;`.
+        # Use a word boundary so we don't accidentally rewrite something
+        # like `myrxx(...)` if it ever appears.
+        line = re.sub(r'\brxx\s*\(', 'xx(', line)
+
+        out_lines.append(line)
+        i += 1
+
+    return '\n'.join(out_lines) + ('\n' if qasm.endswith('\n') else '')
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
@@ -295,18 +336,21 @@ def main():
     # every task submitted inside its `with` block to the reservation, so it
     # bills against the reserved window instead of on-demand QPU time.
     #
-    # Braket's OpenQASM 3 parser rejects `include "stdgates.inc";` — its
-    # standard gates are already built in. Tell qiskit's exporter to (a) emit
-    # no include lines and (b) treat Braket's built-in gates as pre-defined,
-    # so it only emits a gate def for the one non-built-in we use (`rxx`,
-    # decomposed into h/cx/rz, all of which Braket has natively).
+    # Braket's OpenQASM 3 parser is restrictive: it rejects both `include`
+    # statements AND user-defined `gate` declarations — only its built-in
+    # gates are allowed. Qiskit's `rxx` isn't a Braket built-in, but Braket's
+    # `xx(angle)` is the same matrix (verified: xx(θ) = exp(-iθ/2 X⊗X) =
+    # qiskit RXX(θ)). So we (a) declare Braket built-ins as basis_gates so
+    # qiskit emits no defs for them, (b) drop the include line, and (c)
+    # rewrite the `rxx` definition + every `rxx(...)` call to `xx(...)`.
     BRAKET_BUILTIN_GATES = ['h', 'cx', 'cnot',
-                            'rx', 'ry', 'rz',
+                            'rx', 'ry', 'rz', 'xx',
                             'x',  'y',  'z',
                             's',  't',  'swap', 'i']
     qasm_src = qasm3.dumps(qc_hw,
                             includes=(),
                             basis_gates=BRAKET_BUILTIN_GATES)
+    qasm_src = _rewrite_qasm_for_braket(qasm_src)
 
     print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} under reservation {RES_ARN} ...")
     with DirectReservation(device, reservation_arn=RES_ARN):
