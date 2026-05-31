@@ -294,7 +294,19 @@ def main():
     # The DirectReservation context manager (recommended by Braket) routes
     # every task submitted inside its `with` block to the reservation, so it
     # bills against the reserved window instead of on-demand QPU time.
-    qasm_src = qasm3.dumps(qc_hw)
+    #
+    # Braket's OpenQASM 3 parser rejects `include "stdgates.inc";` — its
+    # standard gates are already built in. Tell qiskit's exporter to (a) emit
+    # no include lines and (b) treat Braket's built-in gates as pre-defined,
+    # so it only emits a gate def for the one non-built-in we use (`rxx`,
+    # decomposed into h/cx/rz, all of which Braket has natively).
+    BRAKET_BUILTIN_GATES = ['h', 'cx', 'cnot',
+                            'rx', 'ry', 'rz',
+                            'x',  'y',  'z',
+                            's',  't',  'swap', 'i']
+    qasm_src = qasm3.dumps(qc_hw,
+                            includes=(),
+                            basis_gates=BRAKET_BUILTIN_GATES)
 
     print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} under reservation {RES_ARN} ...")
     with DirectReservation(device, reservation_arn=RES_ARN):
