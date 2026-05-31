@@ -1,6 +1,6 @@
 from braket.aws import AwsDevice
 
-DEVICE_ARN = "arn:aws:braket:us-east-1::device/qpu/ionq / Forte - Enterprise - 1"
+DEVICE_ARN = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
 dev = AwsDevice(DEVICE_ARN)
 props = dev.properties
 
