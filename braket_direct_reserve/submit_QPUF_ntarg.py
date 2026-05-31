@@ -2,20 +2,28 @@
 """
 submit_QPUF_ntarg.py
 ====================
-Submits a two-stage QPE QPUF circuit to IonQ Forte-1 on AWS Braket, generalized
-to n_targ > 1 target qubits using exact Haar-random n-qubit unitaries.
+Submits a two-stage QPE QPUF circuit to IonQ Forte-Enterprise-1 on AWS
+Braket, generalised to n_targ > 1 target qubits using exact Haar-random
+n-qubit unitaries.
 
-Circuit shape (one shared precision register, reused via MCM + reset):
+Circuit shape (single quantum + single classical register, as required by
+Braket OpenQASM 3). Stage 2 uses a fresh precision-ancilla block because
+Forte-Enterprise-1 does NOT expose `reset` via its OpenQASM submission
+path (verified against `device.properties.action.supportedOperations`):
 
     target[n_targ]    : Haar-random initial state (one RY+RZ per target qubit)
-    prec[n_prec]      : QPE ancillae (reused across the two stages)
+    prec_a[n_prec]    : QPE ancillae for stage 1
+    prec_b[n_prec]    : QPE ancillae for stage 2 (disjoint from prec_a)
 
-      H^{⊗n_prec} ── ctrl-U^{2^{n_prec-1-k}} ── invQFT ── measure → c1 ── reset
-      H^{⊗n_prec} ── ctrl-U^{2^{n_prec-1-k}} ── invQFT ── measure → c2
+      H^{⊗n_prec} ── ctrl-U^{2^{n_prec-1-k}} ── invQFT ── measure → c[0..n_prec-1]
+                                                                      (MCM — target collapses)
+      H^{⊗n_prec} ── ctrl-U^{2^{n_prec-1-k}} ── invQFT ── measure → c[n_prec..2n_prec-1]
 
 The same Haar-random U is used in both stages (this is the PE-QPUF
 construction — the second-stage outcomes verify the eigenstate collapsed by
-stage 1).
+the stage-1 mid-circuit measurement).
+
+Qubit budget: N_TARG + 2 * N_PREC must fit Forte-Enterprise-1 (35 qubits).
 
 Haar sampling: complex Ginibre → QR → phase-fix diag(R)/|diag(R)|
 (Mezzadri, arXiv:math-ph/0609050).
@@ -23,9 +31,6 @@ Haar sampling: complex Ginibre → QR → phase-fix diag(R)/|diag(R)|
 Controlled-U synthesis: U^{2^k} computed classically via np.linalg.matrix_power,
 wrapped as qiskit UnitaryGate, then .control(1). Qiskit's transpiler decomposes
 the controlled arbitrary unitary into native gates at submission time.
-
-IonQ Forte-1: 36 qubits, all-to-all connectivity, supports MCM + reset via
-Braket Direct.
 """
 
 # ── CONFIGURATION ──────────────────────────────────────────────────────────────
@@ -131,22 +136,31 @@ def build_qpe_stage(n_prec: int, U: np.ndarray) -> QuantumCircuit:
 def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray,
                        target_init_seed: int) -> QuantumCircuit:
     """
-    Two-stage QPE QPUF on a single flat qubit/classical register pair.
+    Two-stage QPE QPUF, flattened to one quantum + one classical register
+    (Braket OpenQASM 3 allows only one of each).
 
-    Braket's OpenQASM 3 parser allows ONLY ONE quantum register and ONE
-    classical register per program. We flatten:
-        q[0 .. n_targ-1]                 → target qubits
-        q[n_targ .. n_targ+n_prec-1]     → precision qubits
-        c[0 .. n_prec-1]                 → stage-1 outcomes (low bits)
-        c[n_prec .. 2*n_prec-1]          → stage-2 outcomes (high bits)
+    Forte-Enterprise-1 does NOT expose `reset` via the OpenQASM submission
+    path (verified by querying its `supportedOperations`), so we cannot
+    reuse the precision register across stages. Instead we allocate two
+    disjoint precision blocks. MCM on the stage-1 block still collapses
+    the target (`supportsUnassignedMeasurements: True`), so the stage-2
+    block performs QPE on the same collapsed eigenstate — preserving the
+    PE-QPUF construction.
+
+        q[0 .. n_targ-1]                            → target
+        q[n_targ .. n_targ+n_prec-1]                → prec_a  (stage 1)
+        q[n_targ+n_prec .. n_targ+2*n_prec-1]       → prec_b  (stage 2)
+        c[0 .. n_prec-1]                            → stage-1 outcomes (low bits)
+        c[n_prec .. 2*n_prec-1]                     → stage-2 outcomes (high bits)
     """
-    n_total  = n_targ + n_prec
-    q        = QuantumRegister(n_total, "q")
-    c        = ClassicalRegister(2 * n_prec, "c")
-    qc       = QuantumCircuit(q, c)
+    n_total    = n_targ + 2 * n_prec
+    q          = QuantumRegister(n_total, "q")
+    c          = ClassicalRegister(2 * n_prec, "c")
+    qc         = QuantumCircuit(q, c)
 
-    targ_idx = list(range(0, n_targ))
-    prec_idx = list(range(n_targ, n_targ + n_prec))
+    targ_idx   = list(range(0, n_targ))
+    prec_a_idx = list(range(n_targ,             n_targ + n_prec))
+    prec_b_idx = list(range(n_targ + n_prec,    n_targ + 2 * n_prec))
 
     # Target initialisation: one RY+RZ per qubit, seeded independently of U.
     init_rng = np.random.default_rng(seed=target_init_seed)
@@ -156,21 +170,21 @@ def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray,
         qc.ry(theta0, q[i])
         qc.rz(phi0,   q[i])
 
-    # Stage 1 QPE  — prec first, to match build_qpe_stage's qubit layout
-    # [prec[0], ..., prec[n_prec-1], targ[0], ..., targ[n_targ-1]].
+    # Stage 1 QPE on prec_a + targ. build_qpe_stage expects the precision
+    # qubits first, then the target qubits.
     qpe1 = build_qpe_stage(n_prec, U)
-    qc.append(qpe1, prec_idx + targ_idx)
+    qc.append(qpe1, prec_a_idx + targ_idx)
 
-    # MCM + reset on the precision qubits so they can be reused for stage 2.
-    qc.measure([q[i] for i in prec_idx], [c[k] for k in range(n_prec)])
-    for i in prec_idx:
-        qc.reset(q[i])
+    # Mid-circuit measurement of stage-1 precision register. This collapses
+    # the target onto an eigenstate of U; the stage-2 QPE that follows then
+    # acts on that collapsed state.
+    qc.measure([q[i] for i in prec_a_idx], [c[k] for k in range(n_prec)])
 
-    # Stage 2 QPE on the collapsed target, reusing the same prec qubits.
+    # Stage 2 QPE on prec_b + (already-collapsed) targ.
     qpe2 = build_qpe_stage(n_prec, U)
-    qc.append(qpe2, prec_idx + targ_idx)
+    qc.append(qpe2, prec_b_idx + targ_idx)
 
-    qc.measure([q[i] for i in prec_idx], [c[n_prec + k] for k in range(n_prec)])
+    qc.measure([q[i] for i in prec_b_idx], [c[n_prec + k] for k in range(n_prec)])
 
     return qc
 
@@ -286,7 +300,7 @@ def main():
         print(f"\nERROR: circuit needs {qc.num_qubits} qubits but {DEVICE_NAME} "
               f"only has {device_n_qubits}.")
         print(f"       Reduce N_PREC and/or N_TARG so that "
-              f"N_PREC + N_TARG ≤ {device_n_qubits}.")
+              f"N_TARG + 2 * N_PREC ≤ {device_n_qubits}.")
         sys.exit(1)
     print(f"Device qubits    : {device_n_qubits}  "
           f"(circuit uses {qc.num_qubits})")
