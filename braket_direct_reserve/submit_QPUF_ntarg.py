@@ -35,6 +35,7 @@ RES_ARN = "arn:aws:braket:us-east-1:767397707562:reservation/08fda262-2902-4a28-
 N_PREC      = 5          # precision qubits (shared across both stages)
 N_TARG      = 2          # target qubits — Haar-random unitary acts on these
 N_SHOTS     = 100
+
 SEED        = 100           # RNG seed for the Haar-random unitary
 TARGET_INIT_SEED = 99       # RNG seed for the target-state initialisation
 
@@ -216,39 +217,27 @@ def main():
     print(f"\nCircuit qubits   : {qc.num_qubits}  "
           f"(prec={N_PREC} + targ={N_TARG})")
 
-    # ── Resolve backend ────────────────────────────────────────────────────────
+    # ── Resolve device (amazon-braket-sdk; bypass qiskit-braket-provider) ─────
+    # qiskit-braket-provider's adapter refuses to translate `reset`
+    # (NotImplementedError in providers/adapter.py), so we can't go through it
+    # for an MCM+reset circuit. Instead we build/transpile in Qiskit, export
+    # OpenQASM 3, and submit via the Braket SDK directly. IonQ Forte-1 +
+    # Braket Direct accept `reset` at the QASM level.
     try:
-        from qiskit_braket_provider import BraketProvider
-    except ImportError:
-        print("\nERROR: qiskit-braket-provider not installed.")
-        print("       pip install qiskit-braket-provider")
+        from braket.aws import AwsDevice, DirectReservation
+        from braket.ir.openqasm import Program as OpenQasmProgram
+        from qiskit import qasm3
+    except ImportError as e:
+        print(f"\nERROR: missing dependency: {e}")
+        print("       pip install amazon-braket-sdk qiskit")
         sys.exit(1)
 
-    provider = BraketProvider()
-    backend = None
-    for b in provider.backends():
-        dev = getattr(b, "_device", None)
-        if dev and getattr(dev, "arn", None) == DEVICE_ARN:
-            backend = b
-            break
-
-    if backend is None:
-        print(f"\nERROR: Could not find backend for ARN: {DEVICE_ARN}")
-        print("Available backends:")
-        for b in provider.backends():
-            dev = getattr(b, "_device", None)
-            arn = getattr(dev, "arn", "N/A") if dev else "N/A"
-            print(f"  {b.name}  →  {arn}")
-        sys.exit(1)
+    device = AwsDevice(DEVICE_ARN)
+    print(f"Device resolved  : {device.name}")
 
     # ── Qubit-count check ──────────────────────────────────────────────────────
-    device_n_qubits = getattr(backend, "num_qubits", None)
-    if device_n_qubits is None:
-        dev = getattr(backend, "_device", None)
-        caps = getattr(dev, "properties", None) if dev else None
-        device_n_qubits = caps.paradigm.qubitCount if caps is not None else None
-
-    if device_n_qubits is not None and qc.num_qubits > device_n_qubits:
+    device_n_qubits = device.properties.paradigm.qubitCount
+    if qc.num_qubits > device_n_qubits:
         print(f"\nERROR: circuit needs {qc.num_qubits} qubits but {DEVICE_NAME} "
               f"only has {device_n_qubits}.")
         print(f"       Reduce N_PREC and/or N_TARG so that "
@@ -258,12 +247,10 @@ def main():
           f"(circuit uses {qc.num_qubits})")
 
     # ── Transpile ──────────────────────────────────────────────────────────────
-    # Don't pass backend=backend: IonQ Forte's qiskit target advertises only
-    # {gpi, gpi2, rzz, measure, ...} and has no equivalence path from
-    # UnitaryGate/QFT decompositions, plus 'reset' isn't in the target. We
-    # transpile to rz/rx/rxx (≈ IonQ MS), and Braket Direct's server-side
-    # compiler maps these to native gpi/gpi2/rzz at submission time.
-    print(f"\nTranspiling for {backend.name} ...")
+    # rz/rx/rxx ≈ IonQ MS-basis; Braket Direct's server-side compiler maps
+    # these to native gpi/gpi2/zz at submission time. `reset` survives the
+    # transpile and is preserved in the QASM 3 export below.
+    print(f"\nTranspiling for {DEVICE_NAME} ...")
     qc_hw = transpile(
         qc,
         basis_gates=['rz', 'rx', 'rxx', 'measure', 'reset'],
@@ -293,12 +280,29 @@ def main():
     print(f"\nEstimated runtime (literal readout/shot)    : {_fmt(t_est_literal_s)}")
     print(f"Estimated runtime (readout × n_measurements): {_fmt(t_est_permeas_s)}")
 
+    # ── Confirm before submitting ─────────────────────────────────────────────
+    try:
+        resp = input("\nSubmit this job to the QPU? [y/N]: ").strip().lower()
+    except EOFError:
+        resp = ""
+    if resp not in ("y", "yes"):
+        print("Aborted — no job submitted.")
+        return
+
     # ── Submit ─────────────────────────────────────────────────────────────────
-    # reservation_arn routes the task through the Braket Direct reservation so
-    # it bills against the reserved window instead of on-demand QPU time.
+    # Export to OpenQASM 3, then submit via the Braket SDK directly.
+    # The DirectReservation context manager (recommended by Braket) routes
+    # every task submitted inside its `with` block to the reservation, so it
+    # bills against the reserved window instead of on-demand QPU time.
+    qasm_src = qasm3.dumps(qc_hw)
+
     print(f"\nSubmitting {N_SHOTS} shots to {DEVICE_NAME} under reservation {RES_ARN} ...")
-    job          = backend.run(qc_hw, shots=N_SHOTS, reservation_arn=RES_ARN)
-    job_id       = job.job_id()
+    with DirectReservation(device, reservation_arn=RES_ARN):
+        task = device.run(
+            OpenQasmProgram(source=qasm_src),
+            shots=N_SHOTS,
+        )
+    job_id       = task.id    # Braket task ARN — same format as the old code
     submitted_at = datetime.now(timezone.utc).isoformat()
 
     print(f"Job submitted successfully.")
