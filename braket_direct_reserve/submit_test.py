@@ -10,7 +10,8 @@ Two-part check for submit_QPUF_ntarg.py:
      real job will actually cost on the QPU.
 
   2. Small-scale AerSim smoke test — build a tiny 3 prec + 2 targ version
-     with the same MCM+reset construction and run it on AerSimulator to
+     with the same two-disjoint-precision-block construction (no `reset`:
+     prec_a for stage 1, prec_b for stage 2) and run it on AerSimulator to
      confirm the circuit compiles and executes. No QPU submission, no
      logging — the result is only used to check the construction runs
      without errors.
@@ -81,9 +82,10 @@ def production_cost_preview():
     print("=" * 72)
     print(f"DEVICE      : {DEVICE_NAME}")
     print(f"RES_ARN     : {RES_ARN}")
-    print(f"N_PREC      : {PROD_N_PREC}")
+    print(f"N_PREC      : {PROD_N_PREC}  (x2 disjoint blocks — no reset)")
     print(f"N_TARG      : {PROD_N_TARG}")
-    print(f"Total qubits: {PROD_N_PREC + PROD_N_TARG}")
+    print(f"Total qubits: {PROD_N_TARG + 2 * PROD_N_PREC}  "
+          f"(targ + prec_a + prec_b)")
     print(f"SEED        : {PROD_SEED}")
 
     rng = np.random.default_rng(seed=PROD_SEED)
@@ -141,9 +143,10 @@ def small_scale_smoke_test():
     U = haar_random_unitary(d, rng=rng)
 
     err = float(np.max(np.abs(U.conj().T @ U - np.eye(d))))
-    print(f"N_PREC      : {SMOKE_N_PREC}")
+    print(f"N_PREC      : {SMOKE_N_PREC}  (x2 disjoint blocks — no reset)")
     print(f"N_TARG      : {SMOKE_N_TARG}  (U is {d}×{d})")
-    print(f"Total qubits: {SMOKE_N_PREC + SMOKE_N_TARG}")
+    print(f"Total qubits: {SMOKE_N_TARG + 2 * SMOKE_N_PREC}  "
+          f"(targ + prec_a + prec_b)")
     print(f"SEED        : {SMOKE_SEED}")
     print(f"|U†U − I|   : {err:.2e}")
 
