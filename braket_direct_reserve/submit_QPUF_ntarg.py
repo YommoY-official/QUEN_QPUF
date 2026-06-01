@@ -34,11 +34,11 @@ the controlled arbitrary unitary into native gates at submission time.
 """
 
 # ── CONFIGURATION ──────────────────────────────────────────────────────────────
-DEVICE_NAME = "Forte-Enterprise-1"
-DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
+DEVICE_NAME = "Cepheus-1-108Q"
+DEVICE_ARN  = "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q"
 RES_ARN = "arn:aws:braket:us-east-1:767397707562:reservation/08fda262-2902-4a28-b88e-0969df8830c7"
 N_PREC      = 10          # precision qubits (shared across both stages)
-N_TARG      = 3          # target qubits — Haar-random unitary acts on these
+N_TARG      = 2          # target qubits — Haar-random unitary acts on these
 N_SHOTS     = 800
 
 SEED        = 10           # RNG seed for the Haar-random unitary
