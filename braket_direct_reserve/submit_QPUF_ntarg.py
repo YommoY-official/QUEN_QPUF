@@ -37,9 +37,9 @@ the controlled arbitrary unitary into native gates at submission time.
 DEVICE_NAME = "Forte-Enterprise-1"
 DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
 RES_ARN = "arn:aws:braket:us-east-1:767397707562:reservation/08fda262-2902-4a28-b88e-0969df8830c7"
-N_PREC      = 10          # precision qubits (shared across both stages)
+N_PREC      = 15          # precision qubits (shared across both stages)
 N_TARG      = 1          # target qubits — Haar-random unitary acts on these
-N_SHOTS     = 800
+N_SHOTS     = 200
 
 SEED        = 10           # RNG seed for the Haar-random unitary
 TARGET_INIT_SEED = 99       # RNG seed for the target-state initialisation
