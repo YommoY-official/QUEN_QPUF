@@ -26,7 +26,7 @@ Haar sampling: complex Ginibre -> QR -> phase-fix (Mezzadri, math-ph/0609050).
 # -- CONFIGURATION --------------------------------------------------------------
 DEVICE_NAME = "Forte-Enterprise-1"
 DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
-RES_ARN = "arn:aws:braket:us-east-1:767397707562:reservation/08fda262-2902-4a28-b88e-0969df8830c7"
+#RES_ARN = "arn:aws:braket:us-east-1:767397707562:reservation/08fda262-2902-4a28-b88e-0969df8830c7"
 N_PREC      = 6           # precision qubits -- easy to change (see calculator)
 N_TARG      = 1           # single target qubit (Haar-random unitary acts here)
 
@@ -46,6 +46,10 @@ F1Q = 0.9998
 
 RUNTIME_BUDGET_S = 3600.0   # default 1 hour per job
 FIDELITY_FLOOR   = 0.5
+
+# Hard cap: (gates per circuit) * N_SHOTS must stay below this. At N_SHOTS=2500
+# this means <= 400 gates/circuit. Counts 1q + 2q gate operations (not readout).
+MAX_TOTAL_GATES = 1_000_000
 
 EM_MIN_SHOTS = 2500
 # ------------------------------------------------------------------------------
@@ -117,8 +121,8 @@ def build_full_circuit(n_prec, n_targ, U, target_init_seed):
     return qc
 
 
-def _transpiled_counts(n_prec, U, target_init_seed):
-    qc = build_full_circuit(n_prec, N_TARG, U, target_init_seed=target_init_seed)
+def _transpiled_counts(n_prec, n_targ, U, target_init_seed):
+    qc = build_full_circuit(n_prec, n_targ, U, target_init_seed=target_init_seed)
     qc_hw = transpile(qc, basis_gates=IONQ_BASIS, optimization_level=1)
     ops = qc_hw.count_ops()
     n_1q = ops.get('rz', 0) + ops.get('rx', 0)
@@ -132,37 +136,61 @@ def _runtime_estimate_s(n_1q, n_2q, n_shots):
     return STARTUP_TIME_S + n_shots * (per_shot_gates + READOUT_TIME_S)
 
 
-def affordable_nprec_table(target_init_seed=TARGET_INIT_SEED, n_prec_max=15):
+def affordable_nprec_table(n_targ, target_init_seed=TARGET_INIT_SEED, n_prec_max=15):
     # Note: debiasing distributes 2500 shots across symmetrization variants;
     # it does NOT multiply total QPU time beyond the shot count. The >=2500
     # shot floor is the reason the per-shot gate budget is tight.
+    #
+    # Three feasibility constraints per N_PREC:
+    #   (1) runtime  <= RUNTIME_BUDGET_S
+    #   (2) fidelity >= FIDELITY_FLOOR
+    #   (3) (gates/circuit) * N_SHOTS <= MAX_TOTAL_GATES  (gates/circuit = n_1q + n_2q)
     rng = np.random.default_rng(seed=SEED)
-    U = haar_random_unitary(2 ** N_TARG, rng=rng)
-    print("=" * 72)
-    print(f"Affordable-N_PREC calculator  (N_TARG={N_TARG}, N_SHOTS={N_SHOTS}, debiasing ON)")
+    U = haar_random_unitary(2 ** n_targ, rng=rng)
+    max_gates_per_circ = MAX_TOTAL_GATES // N_SHOTS
+    print("=" * 90)
+    print(f"Affordable-N_PREC calculator  (N_TARG={n_targ}, N_SHOTS={N_SHOTS}, debiasing ON)")
     print(f"  runtime budget = {RUNTIME_BUDGET_S/60:.1f} min, fidelity floor = {FIDELITY_FLOOR}")
+    print(f"  total-gate cap = {MAX_TOTAL_GATES:,} = (gates/circuit) * shots "
+          f"=> <= {max_gates_per_circ} gates/circuit at {N_SHOTS} shots")
     print(f"  fidelity model: F = (F2Q={F2Q})^n_2q * (F1Q={F1Q})^n_1q  (tune to calib)")
-    print("=" * 72)
-    header = f"{'N_PREC':>6} | {'n_1q':>5} | {'n_2q':>5} | {'runtime(min)':>12} | {'fidelity':>9}"
+    print("=" * 90)
+    header = (f"{'N_PREC':>6} | {'n_1q':>5} | {'n_2q':>5} | {'gates/cir':>9} | "
+              f"{'tot_gates':>11} | {'runtime(min)':>12} | {'fidelity':>9}")
     print(header)
     print("-" * len(header))
     best_feasible = 0
     for n_prec in range(1, n_prec_max + 1):
-        n_1q, n_2q, _ = _transpiled_counts(n_prec, U, target_init_seed)
+        n_1q, n_2q, _ = _transpiled_counts(n_prec, n_targ, U, target_init_seed)
+        gates_per_circ = n_1q + n_2q
+        total_gates = gates_per_circ * N_SHOTS
         rt_s = _runtime_estimate_s(n_1q, n_2q, N_SHOTS)
         fid = (F2Q ** n_2q) * (F1Q ** n_1q)
-        feasible = (rt_s <= RUNTIME_BUDGET_S) and (fid >= FIDELITY_FLOOR)
+        ok_rt = rt_s <= RUNTIME_BUDGET_S
+        ok_fid = fid >= FIDELITY_FLOOR
+        ok_gates = total_gates <= MAX_TOTAL_GATES
+        feasible = ok_rt and ok_fid and ok_gates
         if feasible:
             best_feasible = n_prec
-        flag = "  <- feasible" if feasible else ""
-        print(f"{n_prec:>6} | {n_1q:>5} | {n_2q:>5} | {rt_s/60:>12.2f} | {fid:>9.4f}{flag}")
+        # Flag which constraint(s) fail, so the binding limit is obvious.
+        if feasible:
+            flag = "  <- feasible"
+        else:
+            fails = []
+            if not ok_gates: fails.append("gates")
+            if not ok_fid:   fails.append("fidelity")
+            if not ok_rt:    fails.append("runtime")
+            flag = "  X " + ",".join(fails)
+        print(f"{n_prec:>6} | {n_1q:>5} | {n_2q:>5} | {gates_per_circ:>9} | "
+              f"{total_gates:>11,} | {rt_s/60:>12.2f} | {fid:>9.4f}{flag}")
     print("-" * len(header))
     if best_feasible > 0:
-        print(f"Recommended MAX feasible N_PREC (runtime<= {RUNTIME_BUDGET_S/60:.0f} min "
-              f"AND fidelity>= {FIDELITY_FLOOR}): {best_feasible}")
+        print(f"Recommended MAX feasible N_PREC (N_TARG={n_targ}): {best_feasible}  "
+              f"[runtime<= {RUNTIME_BUDGET_S/60:.0f} min, fidelity>= {FIDELITY_FLOOR}, "
+              f"tot_gates<= {MAX_TOTAL_GATES:,}]")
     else:
-        print("No N_PREC in range satisfies both constraints.")
-    print("=" * 72)
+        print(f"No N_PREC in range satisfies all constraints for N_TARG={n_targ}.")
+    print("=" * 90)
     return best_feasible
 
 
@@ -196,7 +224,9 @@ def _rewrite_qasm_for_braket(qasm):
 
 
 def main():
-    affordable_nprec_table(target_init_seed=TARGET_INIT_SEED, n_prec_max=15)
+    # Affordability sweep for BOTH 1- and 2-target-qubit QPUFs.
+    for nt in (1, 2):
+        affordable_nprec_table(nt, target_init_seed=TARGET_INIT_SEED, n_prec_max=15)
 
     rng = np.random.default_rng(seed=SEED)
     d = 2 ** N_TARG
@@ -206,7 +236,6 @@ def main():
         print(f"WARNING: |UdagU - I|_max = {err:.2e}")
 
     print(f"\nQPU         : {DEVICE_NAME}  ({DEVICE_ARN})")
-    print(f"RES_ARN     : {RES_ARN}")
     print(f"N_PREC      : {N_PREC}")
     print(f"N_TARG      : {N_TARG}  (U is {d}x{d})")
     print(f"N_SHOTS     : {N_SHOTS}  (debiasing min = {EM_MIN_SHOTS})")
@@ -216,8 +245,7 @@ def main():
     print(f"\nCircuit qubits   : {qc.num_qubits}  (prec={N_PREC} + targ={N_TARG})")
 
     try:
-        from braket.aws import AwsDevice, DirectReservation
-        from braket.experimental_capabilities import EnableExperimentalCapability
+        from braket.aws import AwsDevice
         from braket.ir.openqasm import Program as OpenQasmProgram
         from braket.error_mitigation import Debias
         from qiskit import qasm3
@@ -264,6 +292,17 @@ def main():
     print("Note: debiasing distributes the 2500 shots across symmetrization variants;")
     print("      it does not multiply total QPU time beyond the shot count.")
 
+    # -- Total-gate hard cap: (gates/circuit) * shots must be < MAX_TOTAL_GATES --
+    gates_per_circ = n_1q + n_2q
+    total_gates = gates_per_circ * N_SHOTS
+    print(f"\nTotal gates      : {total_gates:,}  "
+          f"({gates_per_circ} gates/circuit x {N_SHOTS} shots)  "
+          f"[cap {MAX_TOTAL_GATES:,}]")
+    if total_gates > MAX_TOTAL_GATES:
+        print(f"\nERROR: total gates {total_gates:,} exceeds the cap {MAX_TOTAL_GATES:,}. "
+              f"Reduce N_PREC or N_SHOTS.")
+        sys.exit(1)
+
     try:
         resp = input("\nSubmit this job (debiasing ON) to the QPU? [y/N]: ").strip().lower()
     except EOFError:
@@ -278,15 +317,13 @@ def main():
     qasm_src = _rewrite_qasm_for_braket(qasm_src)
 
     # VERIFIED debiasing API: device_parameters={"errorMitigation": Debias()}
-    print(f"\nSubmitting {N_SHOTS} shots (debiasing ON) to {DEVICE_NAME} "
-          f"under reservation {RES_ARN} ...")
-    with DirectReservation(device, reservation_arn=RES_ARN), \
-         EnableExperimentalCapability():
-        task = device.run(
-            OpenQasmProgram(source=qasm_src),
-            shots=N_SHOTS,
-            device_parameters={"errorMitigation": Debias()},
-        )
+    # Submitted on-demand directly to DEVICE_ARN (no reservation).
+    print(f"\nSubmitting {N_SHOTS} shots (debiasing ON) on-demand to {DEVICE_NAME} ...")
+    task = device.run(
+        OpenQasmProgram(source=qasm_src),
+        shots=N_SHOTS,
+        device_parameters={"errorMitigation": Debias()},
+    )
     job_id = task.id
     submitted_at = datetime.now(timezone.utc).isoformat()
 
@@ -299,8 +336,8 @@ def main():
         "datetime": submitted_at,
         "qpu": DEVICE_NAME,
         "device_arn": DEVICE_ARN,
-        "reservation_arn": RES_ARN,
-        "circuit_type": "QPUF_1targ_debias",
+        "submission": "on-demand",
+        "circuit_type": f"QPUF_{N_TARG}targ_debias",
         "n_prec": N_PREC,
         "n_targ": N_TARG,
         "n_shots": N_SHOTS,
@@ -309,6 +346,8 @@ def main():
         "n_gates": n_gates,
         "n_1q_gates": n_1q,
         "n_2q_gates": n_2q,
+        "gates_per_circuit": gates_per_circ,
+        "total_gates": total_gates,
         "n_measurements": n_meas,
         "est_fidelity": est_fid,
         "est_runtime_s_literal": t_est_literal_s,
