@@ -30,7 +30,8 @@ DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
 N_PREC      = 6           # precision qubits -- easy to change (see calculator)
 N_TARG      = 1           # single target qubit (Haar-random unitary acts here)
 
-N_SHOTS     = 2500        # debiasing requires >= 2500 shots (asserted below)
+USE_DEBIAS  = False        # toggle IonQ native debiasing error mitigation ON/OFF
+N_SHOTS     = 2500        # shots; if USE_DEBIAS, must be >= EM_MIN_SHOTS (checked in main)
 
 SEED        = 10
 TARGET_INIT_SEED = 99
@@ -62,10 +63,6 @@ from datetime import datetime, timezone
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.circuit.library import QFTGate, UnitaryGate
-
-assert N_SHOTS >= EM_MIN_SHOTS, (
-    f"IonQ debiasing requires at least {EM_MIN_SHOTS} shots; got N_SHOTS={N_SHOTS}."
-)
 
 JOB_RESULTS_DIR = os.path.join(os.path.dirname(__file__), "job_results")
 LOG_FILE        = os.path.join(JOB_RESULTS_DIR, "job_log.txt")
@@ -224,6 +221,13 @@ def _rewrite_qasm_for_braket(qasm):
 
 
 def main():
+    # Debiasing requires >= EM_MIN_SHOTS shots; without mitigation any count is fine.
+    if USE_DEBIAS and N_SHOTS < EM_MIN_SHOTS:
+        print(f"ERROR: USE_DEBIAS=True requires N_SHOTS >= {EM_MIN_SHOTS}; got {N_SHOTS}.")
+        sys.exit(1)
+
+    em_label = "debias" if USE_DEBIAS else "none"
+
     # Affordability sweep for BOTH 1- and 2-target-qubit QPUFs.
     for nt in (1, 2):
         affordable_nprec_table(nt, target_init_seed=TARGET_INIT_SEED, n_prec_max=15)
@@ -238,7 +242,9 @@ def main():
     print(f"\nQPU         : {DEVICE_NAME}  ({DEVICE_ARN})")
     print(f"N_PREC      : {N_PREC}")
     print(f"N_TARG      : {N_TARG}  (U is {d}x{d})")
-    print(f"N_SHOTS     : {N_SHOTS}  (debiasing min = {EM_MIN_SHOTS})")
+    print(f"N_SHOTS     : {N_SHOTS}")
+    print(f"MITIGATION  : {'debias (ON)' if USE_DEBIAS else 'none (OFF)'}"
+          f"{f'  (debiasing min = {EM_MIN_SHOTS})' if USE_DEBIAS else ''}")
     print(f"SEED        : {SEED}")
 
     qc = build_full_circuit(N_PREC, N_TARG, U, target_init_seed=TARGET_INIT_SEED)
@@ -289,8 +295,9 @@ def main():
 
     print(f"\nEstimated runtime (literal readout/shot)    : {_fmt(t_est_literal_s)}")
     print(f"Estimated runtime (readout x n_measurements): {_fmt(t_est_permeas_s)}")
-    print("Note: debiasing distributes the 2500 shots across symmetrization variants;")
-    print("      it does not multiply total QPU time beyond the shot count.")
+    if USE_DEBIAS:
+        print("Note: debiasing distributes the shots across symmetrization variants;")
+        print("      it does not multiply total QPU time beyond the shot count.")
 
     # -- Total-gate hard cap: (gates/circuit) * shots must be < MAX_TOTAL_GATES --
     gates_per_circ = n_1q + n_2q
@@ -304,7 +311,7 @@ def main():
         sys.exit(1)
 
     try:
-        resp = input("\nSubmit this job (debiasing ON) to the QPU? [y/N]: ").strip().lower()
+        resp = input(f"\nSubmit this job (mitigation: {em_label}) to the QPU? [y/N]: ").strip().lower()
     except EOFError:
         resp = ""
     if resp not in ("y", "yes"):
@@ -317,13 +324,13 @@ def main():
     qasm_src = _rewrite_qasm_for_braket(qasm_src)
 
     # VERIFIED debiasing API: device_parameters={"errorMitigation": Debias()}
-    # Submitted on-demand directly to DEVICE_ARN (no reservation).
-    print(f"\nSubmitting {N_SHOTS} shots (debiasing ON) on-demand to {DEVICE_NAME} ...")
-    task = device.run(
-        OpenQasmProgram(source=qasm_src),
-        shots=N_SHOTS,
-        device_parameters={"errorMitigation": Debias()},
-    )
+    # Submitted on-demand directly to DEVICE_ARN (no reservation). When
+    # USE_DEBIAS is False we omit device_parameters entirely -> no mitigation.
+    print(f"\nSubmitting {N_SHOTS} shots (mitigation: {em_label}) on-demand to {DEVICE_NAME} ...")
+    run_kwargs = {"shots": N_SHOTS}
+    if USE_DEBIAS:
+        run_kwargs["device_parameters"] = {"errorMitigation": Debias()}
+    task = device.run(OpenQasmProgram(source=qasm_src), **run_kwargs)
     job_id = task.id
     submitted_at = datetime.now(timezone.utc).isoformat()
 
@@ -337,12 +344,12 @@ def main():
         "qpu": DEVICE_NAME,
         "device_arn": DEVICE_ARN,
         "submission": "on-demand",
-        "circuit_type": f"QPUF_{N_TARG}targ_debias",
+        "circuit_type": f"QPUF_{N_TARG}targ_{em_label}",
         "n_prec": N_PREC,
         "n_targ": N_TARG,
         "n_shots": N_SHOTS,
-        "error_mitigation": "debias",
-        "em_min_shots": EM_MIN_SHOTS,
+        "error_mitigation": em_label,
+        "em_min_shots": EM_MIN_SHOTS if USE_DEBIAS else None,
         "n_gates": n_gates,
         "n_1q_gates": n_1q,
         "n_2q_gates": n_2q,
