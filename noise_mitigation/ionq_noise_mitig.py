@@ -193,7 +193,17 @@ def affordable_nprec_table(n_targ, target_init_seed=TARGET_INIT_SEED, n_prec_max
 
 def append_job_log(record):
     os.makedirs(JOB_RESULTS_DIR, exist_ok=True)
+    # Guarantee newline separation: if the file already exists and does not end
+    # in a newline (e.g. a prior record was written without one), prepend one so
+    # this record starts on its own line instead of gluing onto the previous.
+    needs_nl = os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > 0
+    if needs_nl:
+        with open(LOG_FILE, "rb") as f:
+            f.seek(-1, os.SEEK_END)
+            needs_nl = f.read(1) != b"\n"
     with open(LOG_FILE, "a") as f:
+        if needs_nl:
+            f.write("\n")
         f.write(json.dumps(record) + "\n")
     print(f"Job record written to: {LOG_FILE}")
 
