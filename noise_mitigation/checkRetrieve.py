@@ -46,6 +46,31 @@ JOB_RESULTS_DIR = os.path.join(os.path.dirname(__file__), "job_results")
 LOG_FILE        = os.path.join(JOB_RESULTS_DIR, "job_log.txt")
 
 
+def read_job_log(path: str) -> list[dict]:
+    """
+    Parse job_log.txt into a list of records.
+
+    Normally one JSON object per line. But if an earlier record was written
+    without a trailing newline, a later append can glue two (or more) objects
+    onto the same line, which `json.loads(line)` rejects with a JSONDecodeError
+    ("Extra data"). We instead stream the whole file through a JSONDecoder,
+    consuming objects one at a time regardless of how the newlines fell.
+    """
+    text = open(path).read()
+    decoder = json.JSONDecoder()
+    records, idx, n = [], 0, len(text)
+    while idx < n:
+        # skip any whitespace (spaces, newlines) between objects
+        while idx < n and text[idx].isspace():
+            idx += 1
+        if idx >= n:
+            break
+        obj, end = decoder.raw_decode(text, idx)
+        records.append(obj)
+        idx = end
+    return records
+
+
 def task_uuid(job_id: str) -> str:
     """Extract the UUID from a Braket task ARN (the slug after the last '/')."""
     return job_id.split("/")[-1]
@@ -134,8 +159,7 @@ def main():
         print(f"ERROR: {LOG_FILE} not found. Submit a job first.")
         sys.exit(1)
 
-    with open(LOG_FILE) as f:
-        records = [json.loads(line) for line in f if line.strip()]
+    records = read_job_log(LOG_FILE)
 
     if not records:
         print("ERROR: job_log.txt is empty.")
