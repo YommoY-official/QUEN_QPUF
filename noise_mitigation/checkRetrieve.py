@@ -155,6 +155,15 @@ def retrieve_counts(job_id: str, device_arn: str) -> dict | None:
 
 
 def main():
+    # Optional results directory argument (default: job_results). Lets this
+    # script retrieve two-stage QPUF jobs too, e.g.:
+    #     python checkRetrieve.py job_results_2stage
+    global JOB_RESULTS_DIR, LOG_FILE
+    if len(sys.argv) > 1:
+        d = sys.argv[1]
+        JOB_RESULTS_DIR = d if os.path.isabs(d) else os.path.join(os.path.dirname(__file__), d)
+        LOG_FILE = os.path.join(JOB_RESULTS_DIR, "job_log.txt")
+
     if not os.path.exists(LOG_FILE):
         print(f"ERROR: {LOG_FILE} not found. Submit a job first.")
         sys.exit(1)
