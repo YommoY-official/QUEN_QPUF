@@ -31,7 +31,7 @@ N_PREC      = 10           # precision qubits -- easy to change (see calculator)
 N_TARG      = 1           # single target qubit (Haar-random unitary acts here)
 
 USE_DEBIAS  = True # toggle IonQ native debiasing error mitigation ON/OFF
-N_SHOTS     = 2500        # shots; if USE_DEBIAS, must be >= EM_MIN_SHOTS (checked in main)
+N_SHOTS     = 5000        # shots; if USE_DEBIAS, must be >= EM_MIN_SHOTS (checked in main)
 
 SEED        = 10
 TARGET_INIT_SEED = 99
@@ -230,7 +230,56 @@ def _rewrite_qasm_for_braket(qasm):
     return '\n'.join(out_lines) + ('\n' if qasm.endswith('\n') else '')
 
 
+# -- Interactive configuration (terminal prompts) --------------------------------
+
+def _parse_bool(s):
+    s = s.strip().lower()
+    if s in ("y", "yes", "t", "true", "1", "on"):
+        return True
+    if s in ("n", "no", "f", "false", "0", "off"):
+        return False
+    raise ValueError(f"expected yes/no, got {s!r}")
+
+
+def _prompt(label, default, cast):
+    """Prompt for a value; blank input or EOF keeps the [default]."""
+    while True:
+        try:
+            raw = input(f"{label} [{default}]: ").strip()
+        except EOFError:
+            return default
+        if raw == "":
+            return default
+        try:
+            return cast(raw)
+        except Exception as e:
+            print(f"  invalid input ({e}); try again or press Enter for {default}.")
+
+
+def prompt_config():
+    """Ask the user for USE_DEBIAS, N_SHOTS, N_PREC, N_TARG and overwrite the
+    module-level config globals with their choices."""
+    global USE_DEBIAS, N_SHOTS, N_PREC, N_TARG
+
+    def _pos_int(s):
+        v = int(s)
+        if v < 1:
+            raise ValueError("must be >= 1")
+        return v
+
+    print("=== Interactive configuration (press Enter to keep the [default]) ===")
+    USE_DEBIAS = _prompt("Use IonQ debiasing? (y/n)", USE_DEBIAS, _parse_bool)
+    N_SHOTS    = _prompt("Number of shots", N_SHOTS, _pos_int)
+    N_PREC     = _prompt("Precision qubits  N_PREC", N_PREC, _pos_int)
+    N_TARG     = _prompt("Target qubits     N_TARG", N_TARG, _pos_int)
+    print(f"--> USE_DEBIAS={USE_DEBIAS}, N_SHOTS={N_SHOTS}, "
+          f"N_PREC={N_PREC}, N_TARG={N_TARG}\n")
+
+
 def main():
+    # Collect configuration interactively, overriding the file defaults.
+    prompt_config()
+
     # Debiasing requires >= EM_MIN_SHOTS shots; without mitigation any count is fine.
     if USE_DEBIAS and N_SHOTS < EM_MIN_SHOTS:
         print(f"ERROR: USE_DEBIAS=True requires N_SHOTS >= {EM_MIN_SHOTS}; got {N_SHOTS}.")
