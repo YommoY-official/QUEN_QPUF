@@ -118,6 +118,39 @@ def build_full_circuit(n_prec, n_targ, U, target_init_seed):
     return qc
 
 
+def build_qpuf_two_stage(n_prec, n_targ, U, target_init_seed):
+    """
+    Two-stage PE-QPUF: the actual QPUF (a single QPE stage is just plain QPE).
+
+    Layout (n_targ + 2*n_prec qubits, two disjoint precision registers):
+        targ[n_targ]  : Haar-random initial state
+        prec_a[n_prec]: QPE stage 1 on U  -> c[0 .. n_prec-1]
+        prec_b[n_prec]: QPE stage 2 on U  -> c[n_prec .. 2*n_prec-1]
+
+    Measurements are terminal (both registers read out at the end). By the
+    deferred-measurement principle this is statistically identical to mid-
+    circuit-measuring prec_a between the stages (prec_a is never reused), and
+    it keeps the circuit a single unitary block -- which is what ZNE folding
+    needs. The QPUF response is the comparison of the two precision registers.
+    """
+    n_total = n_targ + 2 * n_prec
+    q = QuantumRegister(n_total, "q")
+    c = ClassicalRegister(2 * n_prec, "c")
+    qc = QuantumCircuit(q, c)
+    targ_idx   = list(range(0, n_targ))
+    prec_a_idx = list(range(n_targ,             n_targ + n_prec))
+    prec_b_idx = list(range(n_targ + n_prec,    n_targ + 2 * n_prec))
+    init_rng = np.random.default_rng(seed=target_init_seed)
+    for i in targ_idx:
+        qc.ry(init_rng.uniform(0, np.pi), q[i])
+        qc.rz(init_rng.uniform(0, 2 * np.pi), q[i])
+    qc.append(build_qpe_stage(n_prec, U), prec_a_idx + targ_idx)   # stage 1
+    qc.append(build_qpe_stage(n_prec, U), prec_b_idx + targ_idx)   # stage 2
+    qc.measure([q[i] for i in prec_a_idx], [c[k] for k in range(n_prec)])
+    qc.measure([q[i] for i in prec_b_idx], [c[n_prec + k] for k in range(n_prec)])
+    return qc
+
+
 def _transpiled_counts(n_prec, n_targ, U, target_init_seed):
     qc = build_full_circuit(n_prec, n_targ, U, target_init_seed=target_init_seed)
     qc_hw = transpile(qc, basis_gates=IONQ_BASIS, optimization_level=1)
@@ -189,6 +222,114 @@ def affordable_nprec_table(n_targ, target_init_seed=TARGET_INIT_SEED, n_prec_max
         print(f"No N_PREC in range satisfies all constraints for N_TARG={n_targ}.")
     print("=" * 90)
     return best_feasible
+
+
+def zne_resource_estimate(n_targ, n_prec, n_shots, scale_factors=(1, 3, 5),
+                          seed=SEED, target_init_seed=TARGET_INIT_SEED,
+                          print_table=True):
+    """
+    Hardware-resource cost of running ZERO-NOISE EXTRAPOLATION (ZNE) on the
+    TWO-STAGE QPUF (n_targ + 2*n_prec qubits).
+
+    ZNE is not one circuit: it submits one circuit per noise-scale factor lambda
+    and extrapolates to lambda=0. Global folding at an odd integer lambda repeats
+    the circuit (C -> C (C^dag C)^k, lambda = 2k+1), so the folded circuit has
+    EXACTLY lambda x the gates of the base circuit. We therefore transpile the
+    base QPUF once to IonQ native gates and scale.
+
+    Conservative model: no gate cancellation at the fold boundaries (an upper
+    bound on cost). Measurements are terminal and are NOT folded/duplicated, so
+    readout is charged once per shot per circuit, independent of lambda.
+
+    Returns a dict of base counts, per-scale-factor rows, and totals.
+    """
+    scales = [int(s) for s in scale_factors]
+    for s in scales:
+        if s < 1 or s % 2 == 0:
+            raise ValueError(f"ZNE scale factors must be ODD positive integers; got {s}. "
+                             "Odd integers keep global folding exact (C (C^dag C)^k).")
+    scales = sorted(set(scales))
+
+    # base transpiled native-gate counts of the two-stage QPUF
+    rng = np.random.default_rng(seed=seed)
+    U = haar_random_unitary(2 ** n_targ, rng=rng)
+    qc = build_qpuf_two_stage(n_prec, n_targ, U, target_init_seed)
+    qc_hw = transpile(qc, basis_gates=IONQ_BASIS, optimization_level=1)
+    ops = qc_hw.count_ops()
+    base_1q = ops.get('rz', 0) + ops.get('rx', 0)
+    base_2q = ops.get('rxx', 0)
+    base_meas = ops.get('measure', 0)
+    n_qubits = n_targ + 2 * n_prec
+
+    rows = []
+    sum_lambda = sum(scales)
+    total_runtime_s = 0.0
+    all_caps_ok = True
+    for s in scales:
+        f1q, f2q = s * base_1q, s * base_2q
+        gpc = f1q + f2q                       # gates per (folded) circuit
+        tot_gates = gpc * n_shots             # per-circuit gate-cap quantity
+        rt = _runtime_estimate_s(f1q, f2q, n_shots)
+        fid = (F2Q ** f2q) * (F1Q ** f1q)
+        cap_ok = tot_gates <= MAX_TOTAL_GATES
+        all_caps_ok = all_caps_ok and cap_ok
+        total_runtime_s += rt
+        rows.append(dict(scale=s, n_1q=f1q, n_2q=f2q, gates_per_circuit=gpc,
+                         total_gates=tot_gates, runtime_s=rt, fidelity=fid,
+                         cap_ok=cap_ok))
+
+    total_shots = n_shots * len(scales)
+    total_submitted_gates = sum_lambda * (base_1q + base_2q)        # across all circuits
+    total_executed_ops = total_submitted_gates * n_shots           # x shots = QPU work
+
+    result = dict(
+        n_targ=n_targ, n_prec=n_prec, n_qubits=n_qubits, n_shots=n_shots,
+        scale_factors=scales, base_1q=base_1q, base_2q=base_2q, base_meas=base_meas,
+        rows=rows, n_circuits=len(scales), total_shots=total_shots,
+        total_submitted_gates=total_submitted_gates,
+        total_executed_ops=total_executed_ops,
+        total_runtime_s=total_runtime_s, all_caps_ok=all_caps_ok,
+        fits_device=n_qubits <= 35,
+    )
+
+    if print_table:
+        def _fmt_t(t):
+            return f"{t:8.1f} s ({t/60:6.2f} min)"
+        print("=" * 92)
+        print(f"ZNE hardware resource estimate  -- TWO-STAGE QPUF  ({DEVICE_NAME})")
+        print(f"  N_TARG={n_targ}, N_PREC={n_prec}  ->  {n_qubits} qubits"
+              + ("" if result["fits_device"] else "  !! EXCEEDS 35-qubit device !!"))
+        print(f"  base native gates: {base_1q} x 1q, {base_2q} x 2q  "
+              f"({base_1q + base_2q} total), {base_meas} measurements")
+        print(f"  shots/circuit={n_shots}, scale factors={scales}  "
+              f"(per-circuit gate cap = {MAX_TOTAL_GATES:,})")
+        print("-" * 92)
+        hdr = (f"{'scale':>5} | {'1q':>6} | {'2q':>6} | {'gates/cir':>9} | "
+               f"{'gates*shots':>12} | {'runtime':>20} | {'est.F':>7} | cap")
+        print(hdr); print("-" * len(hdr))
+        for r in rows:
+            print(f"{r['scale']:>5} | {r['n_1q']:>6} | {r['n_2q']:>6} | "
+                  f"{r['gates_per_circuit']:>9} | {r['total_gates']:>12,} | "
+                  f"{_fmt_t(r['runtime_s'])} | {r['fidelity']:>7.4f} | "
+                  f"{'ok' if r['cap_ok'] else 'OVER'}")
+        print("-" * len(hdr))
+        print(f"TOTALS over {len(scales)} circuits:")
+        print(f"  total shots submitted    : {total_shots:,}")
+        print(f"  total circuit gates      : {total_submitted_gates:,}  "
+              f"(sum of folded 1q+2q across circuits)")
+        print(f"  total gate-ops executed  : {total_executed_ops:,}  (x shots)")
+        print(f"  total wall-clock (approx): {_fmt_t(total_runtime_s)}")
+        verdict = "VIABLE" if (all_caps_ok and result["fits_device"]) else "NOT VIABLE"
+        why = []
+        if not result["fits_device"]:
+            why.append("exceeds device qubits")
+        if not all_caps_ok:
+            why.append("a folded circuit exceeds the per-circuit gate cap")
+        print(f"  verdict                  : {verdict}"
+              + (f"  ({'; '.join(why)})" if why else ""))
+        print("=" * 92)
+
+    return result
 
 
 def append_job_log(record):
