@@ -27,7 +27,7 @@ Haar sampling: complex Ginibre -> QR -> phase-fix (Mezzadri, math-ph/0609050).
 DEVICE_NAME = "Forte-Enterprise-1"
 DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
 #RES_ARN = "arn:aws:braket:us-east-1:767397707562:reservation/08fda262-2902-4a28-b88e-0969df8830c7"
-N_PREC      = 6           # precision qubits -- easy to change (see calculator)
+N_PREC      = 10           # precision qubits -- easy to change (see calculator)
 N_TARG      = 1           # single target qubit (Haar-random unitary acts here)
 
 USE_DEBIAS  = False # toggle IonQ native debiasing error mitigation ON/OFF
