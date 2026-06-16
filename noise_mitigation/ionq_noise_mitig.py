@@ -30,7 +30,7 @@ DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
 N_PREC      = 10           # precision qubits -- easy to change (see calculator)
 N_TARG      = 1           # single target qubit (Haar-random unitary acts here)
 
-USE_DEBIAS  = False # toggle IonQ native debiasing error mitigation ON/OFF
+USE_DEBIAS  = True # toggle IonQ native debiasing error mitigation ON/OFF
 N_SHOTS     = 2500        # shots; if USE_DEBIAS, must be >= EM_MIN_SHOTS (checked in main)
 
 SEED        = 10
