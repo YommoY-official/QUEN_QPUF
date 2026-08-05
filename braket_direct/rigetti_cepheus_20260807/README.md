@@ -12,8 +12,11 @@ export AWS_DEFAULT_REGION=us-west-1      # Cepheus lives in us-west-1
 python query_device_caps.py              # 1. cache real topology + calibration
 python submit_test.py                    # 2. tiny job, prove the pipeline
 python checkRetrieve.py job_results_test # 3. retrieve it, calibrate the model
-python submit_qpuf_mitigation.py         # 4. the real run
-python checkRetrieve.py                  # 5. retrieve everything
+python submit_qpe.py                     # 4a. QPE run
+python checkRetrieve.py job_results_qpe
+
+python submit_qpuf_mitigation.py         # 4b. two-stage QPUF run
+python checkRetrieve.py
 ```
 
 Set `RES_ARN` in `rigetti_qpuf_common.py` before step 4, otherwise tasks go
@@ -26,8 +29,24 @@ out on-demand and are billed per task instead of against the reservation.
 | `rigetti_qpuf_common.py` | circuit builders, routing, ZNE folding, REM circuits, runtime model — shared by everything else |
 | `query_device_caps.py` | dumps live device caps, writes `device_caps.json` |
 | `submit_test.py` | tiny end-to-end pipeline test (local sim / SV1 / QPU / reservation) |
-| `submit_qpuf_mitigation.py` | the real run; prompts for N_PREC / N_TARG / shots / mitigation, prints full cost, confirms before submitting |
+| `submit_qpe.py` | **plain single-stage QPE** with/without mitigation; prompts for N_PREC / N_TARG / shots / mitigation / input state |
+| `submit_qpuf_mitigation.py` | the two-stage QPUF run; prompts for N_PREC / N_TARG / shots / mitigation |
 | `checkRetrieve.py` | polls task status, saves counts + Rigetti native-Quil metadata to `<dir>/<uuid>.json` |
+
+## QPE vs QPUF
+
+| | `submit_qpe.py` | `submit_qpuf_mitigation.py` |
+|---|---|---|
+| stages | 1 | 2 |
+| qubits | `N_TARG + N_PREC` | `N_TARG + 2*N_PREC` |
+| measurement | one terminal readout of the precision register | two terminal readouts (deferred-measurement form) |
+| reference | exact — `known` mode puts all weight in bin `PHI*2^N_PREC` | m1 vs m2 agreement statistic |
+| results dir | `job_results_qpe/` | `job_results/` |
+
+QPE is the cleaner mitigation benchmark: with `STATE_MODE=known` you know the
+answer exactly, so any spread is measured error and the effect of ZNE/REM is
+directly readable. Verified end to end on the Braket simulator — `PHI=1/8`,
+`N_PREC=6` returns 500/500 shots in bin 8.
 
 ## What changed versus the IonQ scripts
 
