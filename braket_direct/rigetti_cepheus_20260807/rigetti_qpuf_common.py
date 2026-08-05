@@ -153,7 +153,16 @@ def build_qpe_stage(n_prec: int, U: np.ndarray) -> QuantumCircuit:
         power = 2 ** (n_prec - 1 - k)
         cU = UnitaryGate(_stable_matrix_power(U, power), label=f"U^{power}").control(1)
         qc.append(cU, [prec[k]] + targ)
-    qc.append(QFTGate(n_prec).inverse(), prec)
+
+    # ENDIANNESS: the controlled-U loop above gives prec[k] the weight
+    # 2^(n_prec-1-k), i.e. prec[0] is the MSB. Qiskit's QFTGate is
+    # little-endian -- it gives qubit k the weight 2^k. Feeding it `prec`
+    # directly mismatches those conventions, and the result is NOT a harmless
+    # relabelling of the output bins: it SPREADS a sharp phase across many
+    # bins. (Checked: phi=1/8, n_prec=5, exact eigenstate gives bin 4 with
+    # p=1.0 reversed, versus a ~0.18 smear unreversed.) Passing the register
+    # reversed lines the two conventions up.
+    qc.append(QFTGate(n_prec).inverse(), prec[::-1])
     return qc
 
 
@@ -322,6 +331,33 @@ def fetch_device_caps(device) -> dict:
             if val is not None:
                 flags[attr] = val if isinstance(val, (bool, int, str)) else [str(v) for v in val]
 
+    # Per-qubit and per-edge calibration. ErrorMitigation.select_best_qubits
+    # scores candidate placements with these, so persist the FULL specs, not
+    # just medians -- a median tells you nothing about which chiplet is good
+    # today.
+    specs = {}
+    provider = getattr(p, "provider", None)
+    raw = getattr(provider, "specs", None) if provider is not None else None
+    if isinstance(raw, dict):
+        for group in ("1Q", "2Q"):
+            entry = raw.get(group)
+            if isinstance(entry, dict):
+                specs[group] = {
+                    str(k): {kk: vv for kk, vv in v.items()
+                             if isinstance(vv, (int, float))}
+                    for k, v in entry.items() if isinstance(v, dict)
+                }
+
+    exec_windows = []
+    service = getattr(p, "service", None)
+    for w in (getattr(service, "executionWindows", None) or []):
+        exec_windows.append({
+            "executionDay": str(getattr(w, "executionDay", "")),
+            "windowStartHour": str(getattr(w, "windowStartHour", "")),
+            "windowEndHour":   str(getattr(w, "windowEndHour", "")),
+        })
+    shots_range = getattr(service, "shotsRange", None)
+
     return {
         "device_name":     device.name,
         "device_arn":      DEVICE_ARN,
@@ -330,6 +366,9 @@ def fetch_device_caps(device) -> dict:
         "connectivity":    graph,
         "fully_connected": bool(getattr(conn, "fullyConnected", False)) if conn else False,
         "openqasm":        flags,
+        "specs":           specs,
+        "execution_windows": exec_windows,
+        "shots_range":     list(shots_range) if shots_range else None,
     }
 
 
@@ -661,15 +700,21 @@ def encode_unitary(U: np.ndarray) -> dict:
 # -- Reporting -----------------------------------------------------------------
 
 def print_circuit_report(title: str, profile: dict, n_shots: int,
-                         n_logical_qubits: int, caps_are_real: bool) -> dict:
-    """Human-readable circuit + cost report. Returns the runtime estimate."""
+                         n_logical_qubits: int, caps_are_real: bool,
+                         qubit_formula: str = "n_targ + 2*n_prec") -> dict:
+    """
+    Human-readable circuit + cost report. Returns the runtime estimate.
+
+    `qubit_formula` is just the label: the two-stage QPUF needs
+    n_targ + 2*n_prec qubits, plain QPE needs n_targ + n_prec.
+    """
     rt  = estimate_runtime_s(profile, n_shots)
     fid = estimate_fidelity(profile)
 
     print("-" * 78)
     print(title)
     print("-" * 78)
-    print(f"  logical qubits (n_targ + 2*n_prec) : {n_logical_qubits}")
+    print(f"  logical qubits ({qubit_formula}){' ' * max(0, 18 - len(qubit_formula))}: {n_logical_qubits}")
     print(f"  physical qubits touched            : {profile['n_qubits_used']}")
     print(f"  1-qubit gates (rz + rx)            : {profile['n_1q']:,}")
     print(f"  2-qubit gates (cz)                 : {profile['n_2q']:,}")
