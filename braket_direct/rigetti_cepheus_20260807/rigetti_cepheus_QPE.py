@@ -31,7 +31,7 @@ from braket.aws import AwsDevice
 from braket.circuits import Circuit
 
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+# -- Configuration -------------------------------------------------------------
 DEVICE_ARN      = "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q"
 N_TOTAL         = 51
 N_COUNTING      = N_TOTAL - 1          # 50
@@ -43,7 +43,7 @@ S3_BUCKET       = ""                   # ← fill in before running
 S3_PREFIX       = "qpu-benchmark/Cepheus-1-108Q"
 
 
-# ── Gate decompositions ───────────────────────────────────────────────────────
+# -- Gate decompositions -------------------------------------------------------
 def _cphase(circ: Circuit, control: int, target: int, angle: float):
     """CPhaseShift(angle) decomposed into Rz + CNOT (correct up to global phase)."""
     circ.rz(control, angle / 2)
@@ -53,7 +53,7 @@ def _cphase(circ: Circuit, control: int, target: int, angle: float):
     circ.rz(target, angle / 2)
 
 
-# ── Circuit builder ───────────────────────────────────────────────────────────
+# -- Circuit builder -----------------------------------------------------------
 def build_qpe(n_counting: int) -> Circuit:
     """
     Textbook QPE for U = T (φ = 1/8), eigenstate |1⟩.
@@ -64,7 +64,7 @@ def build_qpe(n_counting: int) -> Circuit:
 
     Reads the measured bitstring as an integer m with qubit 0 leftmost;
     m / 2^n_counting estimates φ. For φ = 1/8 the ideal peak bin is
-    2^n_counting / 8 (exact for n_counting ≥ 3).
+    2^n_counting / 8 (exact for n_counting >= 3).
     """
     target   = n_counting
     counting = list(range(n_counting))
@@ -97,13 +97,13 @@ def build_qpe(n_counting: int) -> Circuit:
     return circ
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 def main():
     if not RESERVATION_ARN:
-        print("ERROR: RESERVATION_ARN is empty — set it at the top of this file.")
+        print("ERROR: RESERVATION_ARN is empty -- set it at the top of this file.")
         sys.exit(1)
     if not S3_BUCKET:
-        print("ERROR: S3_BUCKET is empty — set it at the top of this file.")
+        print("ERROR: S3_BUCKET is empty -- set it at the top of this file.")
         sys.exit(1)
 
     print(f"Building QPE circuit: n_total={N_TOTAL}, n_counting={N_COUNTING}, "

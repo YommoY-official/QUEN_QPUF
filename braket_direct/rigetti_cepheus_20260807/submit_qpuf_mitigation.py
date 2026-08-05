@@ -6,7 +6,7 @@ Submit the two-stage PE-QPUF to Rigetti Cepheus-1-108Q under a Braket Direct
 reservation, with client-side noise mitigation.
 
 Interactive: asks for N_PREC (precision qubits per stage), N_TARG (target
-qubits), shots, and which mitigation to apply — then prints the complete
+qubits), shots, and which mitigation to apply -- then prints the complete
 circuit cost (qubit count, 1q/2q gate counts, depth, per-task and total
 runtime estimate) and waits for confirmation BEFORE anything is submitted.
 
@@ -23,7 +23,7 @@ so both techniques here are client-side and cost extra TASKS:
 
        Folding MUST survive to the hardware. A non-verbatim submission is
        recompiled by Rigetti's Quilc, which cancels C^dag C and silently
-       turns every lambda back into 1. That is why VERBATIM defaults to ON —
+       turns every lambda back into 1. That is why VERBATIM defaults to ON --
        run submit_test.py with verbatim first to confirm the device accepts
        it.
 
@@ -31,7 +31,7 @@ so both techniques here are client-side and cost extra TASKS:
        |1...1> on exactly the physical qubits the QPUF measures, giving a
        per-qubit 2x2 confusion matrix to invert at analysis time. Cheap
        (2 tasks, trivial circuits) and on superconducting hardware readout
-       is usually the single largest error source — this is the highest
+       is usually the single largest error source -- this is the highest
        value-per-task mitigation available here.
 
 Everything is logged to job_results/job_log.txt with the `role` and
@@ -56,7 +56,7 @@ from rigetti_qpuf_common import (
     estimate_runtime_s, estimate_fidelity, fmt_time, print_circuit_report,
 )
 
-# ── DEFAULTS (all overridable at the prompt) ──────────────────────────────────
+# -- DEFAULTS (all overridable at the prompt) ----------------------------------
 N_PREC      = 3            # precision qubits PER stage
 N_TARG      = 1            # target qubits (Haar-random U acts here)
 N_SHOTS     = 1000
@@ -68,10 +68,10 @@ SEED             = 10
 TARGET_INIT_SEED = 99
 
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "job_results")
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 
-# ── Prompt helpers ────────────────────────────────────────────────────────────
+# -- Prompt helpers ------------------------------------------------------------
 
 def _pos_int(s: str) -> int:
     v = int(s)
@@ -137,22 +137,23 @@ def prompt_config():
         print("         meaningless. Turn verbatim on, or run ZNE scales = 1 only.\n")
 
 
-# ── Feasibility sweep ─────────────────────────────────────────────────────────
+# -- Feasibility sweep ---------------------------------------------------------
 
 def viability_table(n_targ: int, caps: dict, n_shots: int, n_prec_max: int = 6):
     """
     Sweep N_PREC and show what each costs AFTER routing onto the real lattice.
 
-    This is the table that matters on Rigetti: on IonQ the 2q count grew
-    roughly linearly in N_PREC because every pair could interact directly.
-    Here the router must SWAP, so the cost grows much faster — and the
-    fidelity column usually hits the floor long before the qubit count does.
+    This is the table that decides N_PREC. Note what it does NOT show: a
+    routing catastrophe. On a 108-qubit lattice SABRE only pays ~1.0-1.35x
+    the all-to-all 2q count, because there is room to spread out. The column
+    that actually bites is `est F` -- the QPUF dies of gate infidelity long
+    before it runs out of qubits or connectivity.
     """
     rng = np.random.default_rng(seed=SEED)
     U   = haar_random_unitary(2 ** n_targ, rng=rng)
 
     print("=" * 92)
-    print(f"Feasibility sweep — two-stage QPUF, N_TARG={n_targ}, {n_shots} shots/circuit")
+    print(f"Feasibility sweep -- two-stage QPUF, N_TARG={n_targ}, {n_shots} shots/circuit")
     print(f"  routed onto {caps['device_name']} ({caps['qubit_count']} qubits), "
           f"fidelity model F1Q={F1Q} F2Q={F2Q}")
     print("=" * 92)
@@ -178,14 +179,14 @@ def viability_table(n_targ: int, caps: dict, n_shots: int, n_prec_max: int = 6):
     print("=" * 92 + "\n")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main():
     prompt_config()
 
     caps, caps_are_real = load_device_caps()
     if not caps_are_real:
-        print("NOTE: device_caps.json not found — using a PLACEHOLDER square lattice.")
+        print("NOTE: device_caps.json not found -- using a PLACEHOLDER square lattice.")
         print("      Run `python query_device_caps.py` on the DCV first; gate counts")
         print("      below are the right scale but not the real chip.\n")
 
@@ -197,7 +198,7 @@ def main():
         print(f"ERROR: needs {n_logical} logical qubits, device has {caps['qubit_count']}.")
         sys.exit(1)
 
-    # ── Build the base circuit ────────────────────────────────────────────────
+    # -- Build the base circuit ------------------------------------------------
     rng = np.random.default_rng(seed=SEED)
     d   = 2 ** N_TARG
     U   = haar_random_unitary(d, rng=rng)
@@ -208,8 +209,7 @@ def main():
     print(f"Building + routing the base circuit (N_PREC={N_PREC}, N_TARG={N_TARG}) ...")
     qc    = build_qpuf_two_stage(N_PREC, N_TARG, U, TARGET_INIT_SEED)
     qc_hw = transpile_for_rigetti(qc, caps)
-    base_profile = count_native(qc_hw)
-    phys_qubits  = measured_physical_qubits(qc_hw)
+    phys_qubits = measured_physical_qubits(qc_hw)
 
     print("\n" + "=" * 78)
     print("CONFIGURATION")
@@ -226,7 +226,7 @@ def main():
     print(f"  verbatim          : {USE_VERBATIM}")
     print(f"  seeds             : U={SEED}, target init={TARGET_INIT_SEED}")
 
-    # ── Assemble every circuit that will be submitted ─────────────────────────
+    # -- Assemble every circuit that will be submitted -------------------------
     jobs: list[dict] = []
 
     for scale in ZNE_SCALES:
@@ -250,9 +250,9 @@ def main():
                 "profile":   count_native(cal),
             })
 
-    # ── Report ────────────────────────────────────────────────────────────────
+    # -- Report ----------------------------------------------------------------
     print("\n" + "=" * 78)
-    print(f"CIRCUIT SPECIFICS — {len(jobs)} task(s) will be submitted")
+    print(f"CIRCUIT SPECIFICS -- {len(jobs)} task(s) will be submitted")
     print("=" * 78)
 
     total_runtime = 0.0
@@ -280,7 +280,7 @@ def main():
     print("  qpuRuntimeEstimation before you size the reservation window.")
 
     if not RES_ARN:
-        print("\n  WARNING: RES_ARN is empty — these tasks would be submitted")
+        print("\n  WARNING: RES_ARN is empty -- these tasks would be submitted")
         print("           ON-DEMAND and billed per task, not against a reservation.")
 
     try:
@@ -288,10 +288,10 @@ def main():
     except EOFError:
         resp = ""
     if resp not in ("y", "yes"):
-        print("Aborted — nothing submitted.")
+        print("Aborted -- nothing submitted.")
         return
 
-    # ── Submit ────────────────────────────────────────────────────────────────
+    # -- Submit ----------------------------------------------------------------
     try:
         from braket.aws import AwsDevice, DirectReservation
         from braket.ir.openqasm import Program as OpenQasmProgram
@@ -311,11 +311,13 @@ def main():
     ctx = DirectReservation(device, reservation_arn=RES_ARN) if RES_ARN else None
 
     submitted = []
+    log_file  = os.path.join(RESULTS_DIR, "job_log.txt")
     try:
         if ctx is not None:
             ctx.__enter__()
         for job in jobs:
-            qasm_src = to_braket_qasm(job["circuit"], verbatim=USE_VERBATIM)
+            qasm_src = to_braket_qasm(job["circuit"], verbatim=USE_VERBATIM,
+                                      physical=True)
             print(f"\nSubmitting: {job['label']} ({N_SHOTS} shots) ...")
             task = device.run(OpenQasmProgram(source=qasm_src), shots=N_SHOTS)
             submitted_at = datetime.now(timezone.utc).isoformat()
