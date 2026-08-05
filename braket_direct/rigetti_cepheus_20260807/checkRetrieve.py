@@ -6,7 +6,7 @@ Companion to submit_test.py and submit_qpuf_mitigation.py.
 
 Reads every job listed in <results_dir>/job_log.txt, queries AWS for its
 status, and for COMPLETED tasks writes a self-contained JSON to
-<results_dir>/<uuid>.json. Idempotent — already-saved jobs are skipped, so
+<results_dir>/<uuid>.json. Idempotent -- already-saved jobs are skipped, so
 re-run it as often as you like.
 
     python checkRetrieve.py                  # default: job_results/
@@ -19,7 +19,7 @@ never enumerated (it holds tasks from many unrelated runs).
 Rigetti-specific value
 ----------------------
 Rigetti returns `additional_metadata.rigettiMetadata.nativeQuilMetadata`,
-which is the AUTHORITATIVE post-compilation cost of the circuit — what
+which is the AUTHORITATIVE post-compilation cost of the circuit -- what
 Quilc actually ran, after its own routing and optimisation:
 
     gateVolume            total native gates
@@ -138,7 +138,7 @@ def retrieve_counts(task: AwsQuantumTask):
     on the provider being able to re-resolve the backend.
 
     `measured_qubits` is saved alongside because Braket orders the bitstring
-    by measured qubit index — the analysis needs that mapping to split the
+    by measured qubit index -- the analysis needs that mapping to split the
     string back into the stage-1 and stage-2 precision registers.
     """
     result = task.result()
@@ -165,7 +165,7 @@ def process(records: list[dict], results_dir: str) -> tuple[int, int]:
               f"verbatim={rec.get('verbatim', '?')}")
 
         if os.path.exists(out_path):
-            print("  Already saved — skipping.\n")
+            print("  Already saved -- skipping.\n")
             saved += 1
             continue
 
@@ -180,7 +180,7 @@ def process(records: list[dict], results_dir: str) -> tuple[int, int]:
         if status != "COMPLETED":
             # Under a reservation expect RUNNING -> COMPLETED almost at once.
             # On-demand you may sit in QUEUED for a long while.
-            print("  Not COMPLETED — skipping (re-run later).\n")
+            print("  Not COMPLETED -- skipping (re-run later).\n")
             continue
 
         print("  Retrieving counts ...")
@@ -193,7 +193,7 @@ def process(records: list[dict], results_dir: str) -> tuple[int, int]:
         n_shots_actual = sum(counts.values())
         print(f"  Retrieved {n_shots_actual} shots, {len(counts)} unique outcomes.")
 
-        # ── Timing ────────────────────────────────────────────────────────────
+        # -- Timing ------------------------------------------------------------
         completed_at = task_time_seconds = wall_time_seconds = None
         try:
             meta       = task.metadata()
@@ -238,7 +238,7 @@ def process(records: list[dict], results_dir: str) -> tuple[int, int]:
         if qpu_time_seconds is not None:
             print(f"  QPU exec time : {qpu_time_seconds:.4f} s")
 
-        # ── Predicted vs actual: use this to re-fit the model constants ──────
+        # -- Predicted vs actual: use this to re-fit the model constants ------
         if native_quil:
             print("  --- Rigetti native-Quil metadata (authoritative) ---")
             pred_2q    = rec.get("n_2q_gates")
