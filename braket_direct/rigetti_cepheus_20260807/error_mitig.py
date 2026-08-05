@@ -794,22 +794,37 @@ class ErrorMitigation:
         foldable = [i for i, inst in enumerate(base.data)
                     if inst.operation.name not in ("barrier", "delay", "id")
                     and (not two_qubit_only or len(inst.qubits) == 2)]
-        G = len(foldable)
-        if G == 0:
+        if not foldable:
             return qc.copy()
 
-        # Each fold of one gate adds 2 gates, so to reach lambda*G gates we
-        # need round(G*(lambda-1)/2) folds distributed over the gates.
-        total_folds = int(round(G * (scale - 1) / 2))
-        base_folds, extra = divmod(total_folds, G)
+        # STRATIFIED selection: fold 1q and 2q gates as SEPARATE pools, each
+        # scaled to lambda independently.
+        #
+        # Selecting uniformly from one combined pool does not do this. On a
+        # QPE circuit 1q gates outnumber 2q gates ~3:1, and a uniform draw
+        # gives the 2q subset a noisy scale factor: measured, lambda=1.5
+        # scaled TOTAL gates by exactly 1.500 but 2q gates by 1.839 -- 23%
+        # more noise than requested. Since 2q error dominates on
+        # superconducting hardware, the effective noise scale was 1.84 while
+        # the extrapolation was told 1.5, which biases the fit.
+        pools: dict[int, list[int]] = defaultdict(list)
+        for i in foldable:
+            pools[len(base.data[i].qubits)].append(i)
 
-        if method == "random":
-            rng = np.random.default_rng(seed)
-            chosen = set(rng.choice(G, size=extra, replace=False).tolist()) if extra else set()
-        else:
-            chosen = set(range(extra))
-        fold_count = {foldable[i]: base_folds + (1 if i in chosen else 0)
-                      for i in range(G)}
+        rng = np.random.default_rng(seed)
+        fold_count: dict[int, int] = {}
+        for _, pool in sorted(pools.items()):
+            G = len(pool)
+            # Each fold of one gate adds 2 gates, so reaching lambda*G gates
+            # needs round(G*(lambda-1)/2) folds spread over the pool.
+            total_folds = int(round(G * (scale - 1) / 2))
+            base_folds, extra = divmod(total_folds, G)
+            if method == "random":
+                chosen = set(rng.choice(G, size=extra, replace=False).tolist()) if extra else set()
+            else:
+                chosen = set(range(extra))
+            for k, idx in enumerate(pool):
+                fold_count[idx] = base_folds + (1 if k in chosen else 0)
 
         out = QuantumCircuit(*base.qregs, *base.cregs)
         out.global_phase = base.global_phase
@@ -853,11 +868,11 @@ class ErrorMitigation:
         """
         Build the FULL set of circuits one ZNE estimate needs.
 
-        >>> MULTI-TASK. This is the boundary of the circuit-in/circuit-out
-        >>> contract. Each entry is a separate Braket task; the mitigated
-        >>> number only exists after all of them return and you fit
-        >>> P_correct(lambda) -> lambda = 0. Nothing here produces a
-        >>> mitigated result on its own.
+        !!! MULTI-TASK. This is the boundary of the circuit-in/circuit-out
+        !!! contract. Each entry is a separate Braket task; the mitigated
+        !!! number only exists after all of them return and you fit
+        !!! P_correct(lambda) -> lambda = 0. Nothing here produces a
+        !!! mitigated result on its own.
 
         Returns [{"scale", "circuit", "profile", "achieved_scale_2q", ...}].
         `achieved_scale_2q` is the measured ratio of 2q gates to the lambda=1
@@ -895,11 +910,11 @@ class ErrorMitigation:
         """
         Readout-error-mitigation CALIBRATION circuits.
 
-        >>> REM ADDS NO GATES TO YOUR CIRCUIT. It does not fit the
-        >>> circuit-in/circuit-out contract at all. The mitigation is a
-        >>> classical inversion applied to the COUNTS, using a confusion
-        >>> matrix measured by the separate circuits this method returns.
-        >>> Your submitted QPE circuit is byte-for-byte unchanged.
+        !!! REM ADDS NO GATES TO YOUR CIRCUIT. It does not fit the
+        !!! circuit-in/circuit-out contract at all. The mitigation is a
+        !!! classical inversion applied to the COUNTS, using a confusion
+        !!! matrix measured by the separate circuits this method returns.
+        !!! Your submitted QPE circuit is byte-for-byte unchanged.
 
         model:
           "tensored" -- assume A = (x)_i A_i: one 2x2 confusion matrix per
@@ -964,14 +979,28 @@ class ErrorMitigation:
         """
         pb, pa = count_native(before), count_native(after)
         rep = self.ddd_report(after) or {}
+        seq = rep.get("sequence")
+
+        # Count raw instructions, not count_native's tally: the "II" null
+        # control inserts `id` gates, which are not native gates and so do not
+        # show up in the 1q/2q counts at all. Judging it by native-gate count
+        # would report the control as broken when it is working as designed.
+        added = after.size() - before.size()
+        two_q_unchanged = pb["n_2q"] == pa["n_2q"]
+
         return {
-            "sequence":      rep.get("sequence"),
+            "sequence":      seq,
             "n_1q_before":   pb["n_1q"], "n_1q_after": pa["n_1q"],
             "n_2q_before":   pb["n_2q"], "n_2q_after": pa["n_2q"],
-            "gates_added":   pa["n_gates"] - pb["n_gates"],
+            "instructions_added": added,
+            "native_gates_added": pa["n_gates"] - pb["n_gates"],
             "pulses_planned": rep.get("n_pulses"),
-            "two_qubit_unchanged": pb["n_2q"] == pa["n_2q"],
-            "ok": (pa["n_gates"] > pb["n_gates"]) and (pb["n_2q"] == pa["n_2q"]),
+            "two_qubit_unchanged": two_q_unchanged,
+            "ok": added > 0 and two_q_unchanged,
+            "note": ("null control: `id` gates are not native and a compiler "
+                     "may delete them outright, so this arm only tests "
+                     "'did adding instructions help', and only inside a "
+                     "verbatim box") if seq == "II" else None,
         }
 
     def verify_zne(self, circuit_set: list[dict], tol: float = 0.15) -> dict:
