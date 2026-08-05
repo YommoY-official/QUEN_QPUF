@@ -18,19 +18,22 @@ Why this differs from the IonQ (Forte-Enterprise-1) scripts
    EnableExperimentalCapability). Rigetti does not offer it. So the QPUF
    uses the DEFERRED-MEASUREMENT form: two disjoint precision registers,
    both measured terminally. Since prec_a is never reused after stage 1,
-   this is statistically identical to mid-circuit measuring it — and it
+   this is statistically identical to mid-circuit measuring it -- and it
    keeps the circuit a single unitary block, which is exactly what ZNE
    folding requires.
 
 2. FIXED LATTICE, not all-to-all.
    IonQ's trap gives every qubit-pair a direct 2q gate. Cepheus is a
    superconducting lattice, so the transpiler must insert SWAPs. QPE is
-   the worst case for this: every precision qubit must interact with the
-   target, and the inverse QFT is all-to-all within the precision
-   register. Expect the 2q count to blow up by ~an order of magnitude
-   versus the IonQ numbers. This is why we transpile against the REAL
-   connectivity graph (see load_coupling_map) instead of assuming
-   all-to-all.
+   the natural worst case: every precision qubit must reach the target,
+   and the inverse QFT is all-to-all within the precision register.
+   Measured penalty (SABRE routing, degree-4 lattice, two-stage QPUF):
+   only ~1.0-1.35x the all-to-all 2q count for N_PREC <= 6, because 108
+   qubits give the router plenty of room to spread out. So routing is
+   NOT the thing that kills this circuit on Rigetti -- per-gate fidelity
+   is. We still transpile against the REAL connectivity graph, because
+   an unrouted count would be a guess and verbatim mode needs real
+   lattice edges anyway.
 
 3. NO vendor-native error mitigation.
    IonQ's `Debias` is IonQ-only. On Rigetti we do mitigation client-side:
@@ -48,7 +51,7 @@ Why this differs from the IonQ (Forte-Enterprise-1) scripts
 
 5. VERBATIM MODE MATTERS FOR ZNE.
    Non-verbatim submissions are recompiled by Rigetti's Quilc, which will
-   happily cancel the C^dag C pairs that ZNE folding just inserted —
+   happily cancel the C^dag C pairs that ZNE folding just inserted --
    silently reducing every lambda back to lambda=1. Submitting inside a
    `#pragma braket verbatim box` disables that recompilation. Verbatim
    requires physical qubits and native gates only, which is why we
@@ -57,14 +60,13 @@ Why this differs from the IonQ (Forte-Enterprise-1) scripts
 
 import json
 import os
-from typing import Iterable
 
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.circuit.library import QFTGate, UnitaryGate
 from qiskit.transpiler import CouplingMap
 
-# ── DEVICE ────────────────────────────────────────────────────────────────────
+# -- DEVICE --------------------------------------------------------------------
 DEVICE_NAME = "Cepheus-1-108Q"
 DEVICE_ARN  = "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q"
 AWS_REGION  = "us-west-1"
@@ -73,7 +75,7 @@ AWS_REGION  = "us-west-1"
 # on-demand (which costs per-task money outside the window).
 RES_ARN = ""
 
-# ── NATIVE GATE SET ───────────────────────────────────────────────────────────
+# -- NATIVE GATE SET -----------------------------------------------------------
 # Rigetti's Braket native set is rx(k*pi/2) / rz(theta) / cz (+ iswap, xy on
 # some chips). We transpile to rz/rx/cz because that is the safest common
 # subset and the one verbatim mode is guaranteed to accept.
@@ -81,8 +83,8 @@ RES_ARN = ""
 # writes device_caps.json, which load_native_basis() picks up if present.
 RIGETTI_BASIS = ["rz", "rx", "cz"]
 
-# ── GATE-TIME MODEL ───────────────────────────────────────────────────────────
-# PLACEHOLDERS — Rigetti does not publish per-gate durations through Braket.
+# -- GATE-TIME MODEL -----------------------------------------------------------
+# PLACEHOLDERS -- Rigetti does not publish per-gate durations through Braket.
 # Order of magnitude is right (ns-scale gates, us-scale readout), but the
 # absolute runtime is dominated by SHOT_RESET_S and STARTUP_TIME_S, both of
 # which you should re-fit from the first real task (checkRetrieve.py prints
@@ -96,13 +98,13 @@ STARTUP_TIME_S   = 15.0       # per-task overhead: Quilc compile + chip load
 # Per-gate fidelity model for the "is this circuit worth running" check.
 # TUNE to the live calibration (query_device_caps.py dumps the per-qubit and
 # per-edge fidelities Rigetti reports).
-F2Q = 0.97       # CZ  — Cepheus-class median
+F2Q = 0.97       # CZ  -- Cepheus-class median
 F1Q = 0.999      # rx
 
 CONN_CACHE  = os.path.join(os.path.dirname(__file__), "device_caps.json")
 
 
-# ── Haar-random unitary ───────────────────────────────────────────────────────
+# -- Haar-random unitary -------------------------------------------------------
 
 def haar_random_unitary(d: int, rng: np.random.Generator | None = None) -> np.ndarray:
     """
@@ -129,7 +131,7 @@ def _stable_matrix_power(U: np.ndarray, power: int) -> np.ndarray:
     return W @ Vh
 
 
-# ── Circuit builders ──────────────────────────────────────────────────────────
+# -- Circuit builders ----------------------------------------------------------
 
 def build_qpe_stage(n_prec: int, U: np.ndarray) -> QuantumCircuit:
     """
@@ -151,14 +153,23 @@ def build_qpe_stage(n_prec: int, U: np.ndarray) -> QuantumCircuit:
         power = 2 ** (n_prec - 1 - k)
         cU = UnitaryGate(_stable_matrix_power(U, power), label=f"U^{power}").control(1)
         qc.append(cU, [prec[k]] + targ)
-    qc.append(QFTGate(n_prec).inverse(), prec)
+
+    # ENDIANNESS: the controlled-U loop above gives prec[k] the weight
+    # 2^(n_prec-1-k), i.e. prec[0] is the MSB. Qiskit's QFTGate is
+    # little-endian -- it gives qubit k the weight 2^k. Feeding it `prec`
+    # directly mismatches those conventions, and the result is NOT a harmless
+    # relabelling of the output bins: it SPREADS a sharp phase across many
+    # bins. (Checked: phi=1/8, n_prec=5, exact eigenstate gives bin 4 with
+    # p=1.0 reversed, versus a ~0.18 smear unreversed.) Passing the register
+    # reversed lines the two conventions up.
+    qc.append(QFTGate(n_prec).inverse(), prec[::-1])
     return qc
 
 
 def build_qpuf_two_stage(n_prec: int, n_targ: int, U: np.ndarray,
                          target_init_seed: int) -> QuantumCircuit:
     """
-    Two-stage PE-QPUF — the same construction submitted to Forte-Enterprise-1,
+    Two-stage PE-QPUF -- the same construction submitted to Forte-Enterprise-1,
     in its deferred-measurement form (see module docstring, point 1).
 
         q[0 .. n_targ-1]                        targ    : Haar-random init state
@@ -196,7 +207,102 @@ def build_qpuf_two_stage(n_prec: int, n_targ: int, U: np.ndarray,
     return qc
 
 
-# ── Device connectivity ───────────────────────────────────────────────────────
+# -- Plain QPE (single stage) --------------------------------------------------
+
+def known_phase_unitary(n_targ: int, phi: float) -> np.ndarray:
+    """
+    A diagonal U whose |1...1> eigenstate carries EXACTLY the phase phi:
+    a P(2*pi*phi/n_targ) rotation on each of the n_targ target qubits, so the
+    phases add to 2*pi*phi on |1...1>.
+
+    Why bother instead of a Haar draw: with a known phi you know the answer.
+    QPE should put all its weight in bin round(phi * 2^n_prec), so any spread
+    is measured error -- which is the only way to say whether the mitigation
+    actually helped. With n_targ=1 and phi=1/8 this is the textbook T-gate
+    QPE.
+    """
+    per = np.exp(2j * np.pi * phi / n_targ)
+    d   = 2 ** n_targ
+    diag = np.ones(d, dtype=complex)
+    for j in range(d):
+        # |j> picks up `per` once per target qubit that is set.
+        diag[j] = per ** bin(j).count("1")
+    return np.diag(diag)
+
+
+def build_qpe_circuit(n_prec: int, n_targ: int, U: np.ndarray,
+                      target_init_seed: int | None = None,
+                      eigenstate: bool = False) -> QuantumCircuit:
+    """
+    Textbook single-stage QPE. ONE terminal measurement of the precision
+    register -- no mid-circuit measurement, no second stage, nothing about
+    the readout that needs interpreting.
+
+        q[0 .. n_targ-1]              targ : input state
+        q[n_targ .. n_targ+n_prec-1]  prec : QPE ancillae -> c[0 .. n_prec-1]
+
+    Precision qubit 0 is the MSB, so the measured integer is
+        m = sum_k c[k] * 2^(n_prec-1-k)
+    and the phase estimate is m / 2^n_prec.
+
+    eigenstate=True prepares |1...1> on the target register (use with
+    known_phase_unitary -- that state is an exact eigenvector, so QPE returns
+    a single sharp bin).
+
+    eigenstate=False prepares the same seeded Haar-random target state the
+    QPUF scripts use, so a QPE run is directly comparable to the QPUF run on
+    the same U. A generic state is a superposition of eigenvectors, so the
+    output spreads over several eigenphases even with zero noise.
+    """
+    n_total = n_targ + n_prec
+    q  = QuantumRegister(n_total, "q")
+    c  = ClassicalRegister(n_prec, "c")
+    qc = QuantumCircuit(q, c)
+
+    targ_idx = list(range(0, n_targ))
+    prec_idx = list(range(n_targ, n_targ + n_prec))
+
+    if eigenstate:
+        for i in targ_idx:
+            qc.x(q[i])
+    else:
+        if target_init_seed is None:
+            raise ValueError("target_init_seed is required when eigenstate=False")
+        init_rng = np.random.default_rng(seed=target_init_seed)
+        for i in targ_idx:
+            qc.ry(init_rng.uniform(0, np.pi),     q[i])
+            qc.rz(init_rng.uniform(0, 2 * np.pi), q[i])
+
+    qc.append(build_qpe_stage(n_prec, U), prec_idx + targ_idx)
+    qc.measure([q[i] for i in prec_idx], [c[k] for k in range(n_prec)])
+    return qc
+
+
+def ideal_qpe_distribution(qc_logical: QuantumCircuit, n_prec: int,
+                           n_targ: int, max_qubits: int = 22) -> dict[int, float] | None:
+    """
+    Noiseless QPE output distribution over the measured integer m, by exact
+    statevector simulation of the pre-transpile circuit. This is the
+    reference the hardware counts get scored against.
+
+    Returns None above `max_qubits` (2^n statevector).
+
+    Bit-order note: Statevector.probabilities(qargs=...) makes qargs[0] the
+    LEAST significant bit of the returned index. Our prec[0] is the MOST
+    significant bit of m, so we pass the precision indices REVERSED and the
+    index then equals m directly.
+    """
+    if qc_logical.num_qubits > max_qubits:
+        return None
+    from qiskit.quantum_info import Statevector
+
+    bare = qc_logical.remove_final_measurements(inplace=False)
+    prec_idx = list(range(n_targ, n_targ + n_prec))
+    probs = Statevector.from_instruction(bare).probabilities(qargs=prec_idx[::-1])
+    return {m: float(p) for m, p in enumerate(probs) if p > 1e-12}
+
+
+# -- Device connectivity -------------------------------------------------------
 
 def fetch_device_caps(device) -> dict:
     """
@@ -225,6 +331,33 @@ def fetch_device_caps(device) -> dict:
             if val is not None:
                 flags[attr] = val if isinstance(val, (bool, int, str)) else [str(v) for v in val]
 
+    # Per-qubit and per-edge calibration. ErrorMitigation.select_best_qubits
+    # scores candidate placements with these, so persist the FULL specs, not
+    # just medians -- a median tells you nothing about which chiplet is good
+    # today.
+    specs = {}
+    provider = getattr(p, "provider", None)
+    raw = getattr(provider, "specs", None) if provider is not None else None
+    if isinstance(raw, dict):
+        for group in ("1Q", "2Q"):
+            entry = raw.get(group)
+            if isinstance(entry, dict):
+                specs[group] = {
+                    str(k): {kk: vv for kk, vv in v.items()
+                             if isinstance(vv, (int, float))}
+                    for k, v in entry.items() if isinstance(v, dict)
+                }
+
+    exec_windows = []
+    service = getattr(p, "service", None)
+    for w in (getattr(service, "executionWindows", None) or []):
+        exec_windows.append({
+            "executionDay": str(getattr(w, "executionDay", "")),
+            "windowStartHour": str(getattr(w, "windowStartHour", "")),
+            "windowEndHour":   str(getattr(w, "windowEndHour", "")),
+        })
+    shots_range = getattr(service, "shotsRange", None)
+
     return {
         "device_name":     device.name,
         "device_arn":      DEVICE_ARN,
@@ -233,6 +366,9 @@ def fetch_device_caps(device) -> dict:
         "connectivity":    graph,
         "fully_connected": bool(getattr(conn, "fullyConnected", False)) if conn else False,
         "openqasm":        flags,
+        "specs":           specs,
+        "execution_windows": exec_windows,
+        "shots_range":     list(shots_range) if shots_range else None,
     }
 
 
@@ -285,7 +421,7 @@ def coupling_map_from_caps(caps: dict) -> CouplingMap:
     return CouplingMap(sorted(edges))
 
 
-# ── Transpilation + counting ──────────────────────────────────────────────────
+# -- Transpilation + counting --------------------------------------------------
 
 def transpile_for_rigetti(qc: QuantumCircuit, caps: dict,
                           optimization_level: int = 2,
@@ -296,7 +432,7 @@ def transpile_for_rigetti(qc: QuantumCircuit, caps: dict,
     every controlled-U and every QFT rotation would be assumed free.
 
     The result has num_qubits == device qubit count, with qubit index i
-    meaning PHYSICAL qubit i — which is what verbatim submission needs.
+    meaning PHYSICAL qubit i -- which is what verbatim submission needs.
     """
     return transpile(
         qc,
@@ -312,8 +448,8 @@ def count_native(qc_hw: QuantumCircuit) -> dict:
     Native-gate profile of a transpiled circuit.
 
     Both a serial and a parallel view are returned:
-      n_1q / n_2q   — total gate COUNT (what IonQ runtime tracks)
-      depth_2q      — CZ layers      (what Rigetti runtime tracks)
+      n_1q / n_2q   -- total gate COUNT (what IonQ runtime tracks)
+      depth_2q      -- CZ layers      (what Rigetti runtime tracks)
     """
     ops    = qc_hw.count_ops()
     n_1q   = ops.get("rz", 0) + ops.get("rx", 0) + ops.get("sx", 0) + ops.get("x", 0)
@@ -347,7 +483,7 @@ def measured_physical_qubits(qc_hw: QuantumCircuit) -> list[int]:
     return [out[k] for k in sorted(out)]
 
 
-# ── Noise mitigation: ZNE folding ─────────────────────────────────────────────
+# -- Noise mitigation: ZNE folding ---------------------------------------------
 
 def fold_global(qc_hw: QuantumCircuit, scale: int) -> QuantumCircuit:
     """
@@ -355,7 +491,7 @@ def fold_global(qc_hw: QuantumCircuit, scale: int) -> QuantumCircuit:
 
     The folded circuit has EXACTLY lambda times the gates of the base, so the
     effective noise scales by lambda while the ideal output is unchanged.
-    Only odd integer lambda is allowed — that is what keeps the fold exact
+    Only odd integer lambda is allowed -- that is what keeps the fold exact
     (no partial/local folding, no fractional bookkeeping).
 
     IMPORTANT: fold AFTER transpiling, and do NOT re-transpile the result.
@@ -363,7 +499,7 @@ def fold_global(qc_hw: QuantumCircuit, scale: int) -> QuantumCircuit:
     folded circuit must be submitted inside a verbatim box, or Rigetti's
     server-side Quilc will undo the fold (see module docstring, point 5).
 
-    Measurements are terminal and are NOT folded — readout is charged once
+    Measurements are terminal and are NOT folded -- readout is charged once
     per shot regardless of lambda.
     """
     if scale < 1 or scale % 2 == 0:
@@ -384,7 +520,7 @@ def fold_global(qc_hw: QuantumCircuit, scale: int) -> QuantumCircuit:
     return out
 
 
-# ── Noise mitigation: readout calibration ─────────────────────────────────────
+# -- Noise mitigation: readout calibration -------------------------------------
 
 def readout_calibration_circuits(phys_qubits: list[int], n_device_qubits: int
                                  ) -> list[tuple[str, QuantumCircuit]]:
@@ -400,7 +536,7 @@ def readout_calibration_circuits(phys_qubits: list[int], n_device_qubits: int
     2^n, and readout crosstalk on Rigetti is weak enough that the tensored
     model is the standard choice.
 
-    Circuits are built directly on physical indices — they are trivially
+    Circuits are built directly on physical indices -- they are trivially
     connectivity-compatible (single-qubit gates only), so they never need
     routing and can go into a verbatim box unchanged.
     """
@@ -416,20 +552,20 @@ def readout_calibration_circuits(phys_qubits: list[int], n_device_qubits: int
     return out
 
 
-# ── Runtime model ─────────────────────────────────────────────────────────────
+# -- Runtime model -------------------------------------------------------------
 
 def estimate_runtime_s(profile: dict, n_shots: int) -> dict:
     """
     Two runtime estimates for one task.
 
-      serial   — every gate executed one after another. This is the IonQ-style
+      serial   -- every gate executed one after another. This is the IonQ-style
                  model and is a hard UPPER bound on Rigetti.
-      parallel — gates in a layer execute simultaneously, so the circuit takes
+      parallel -- gates in a layer execute simultaneously, so the circuit takes
                  depth * gate-time. This is the realistic Rigetti model.
 
     Both add per-shot readout and the inter-shot reset delay, plus a fixed
     per-task startup. On Rigetti the per-shot reset delay usually dominates
-    the gates entirely — which is why shot count, not circuit size, drives
+    the gates entirely -- which is why shot count, not circuit size, drives
     the wall clock.
     """
     d1q = max(profile["depth"] - profile["depth_2q"], 0)
@@ -457,14 +593,15 @@ def fmt_time(t_s: float) -> str:
     return f"{t_s:8.2f} s  ({t_s/60:6.2f} min)"
 
 
-# ── OpenQASM 3 export for Braket ──────────────────────────────────────────────
+# -- OpenQASM 3 export for Braket ----------------------------------------------
 
 BRAKET_BUILTIN_GATES = ["rx", "ry", "rz", "cz", "cnot", "cx", "h",
                         "x", "y", "z", "s", "t", "swap", "i", "iswap",
                         "cphaseshift", "xy"]
 
 
-def to_braket_qasm(qc_hw: QuantumCircuit, verbatim: bool = False) -> str:
+def to_braket_qasm(qc_hw: QuantumCircuit, verbatim: bool = False,
+                   physical: bool | None = None) -> str:
     """
     Export to OpenQASM 3 that Braket's parser accepts.
 
@@ -472,50 +609,69 @@ def to_braket_qasm(qc_hw: QuantumCircuit, verbatim: bool = False) -> str:
     user-defined `gate` blocks. Declaring the built-ins as basis_gates stops
     qiskit emitting definitions for them.
 
-    verbatim=True additionally rewrites virtual qubits q[i] -> physical $i and
-    wraps the body in `#pragma braket verbatim / box { ... }`, which tells
-    Braket to run the circuit EXACTLY as written — no Quilc recompilation,
-    no gate cancellation. That is mandatory for ZNE folding to survive, and
-    it is only valid because transpile_for_rigetti already produced native
-    gates on real lattice edges.
+    physical=True addresses PHYSICAL qubits (`$3`) instead of a virtual
+    register (`qubit[n] q; ... q[3]`). Use it for anything going to the QPU:
+    we route the circuit ourselves, so the qubit indices are already the ones
+    we want, and virtual indices would let Rigetti's compiler silently remap
+    the circuit onto different physical qubits -- which would invalidate the
+    readout-calibration circuits, since they must hit exactly the qubits the
+    QPUF reads. Simulators have no physical qubits, so leave it False there.
+    (qiskit already emits `$n` for a circuit that carries a transpiler
+    layout; this makes the behaviour explicit and covers circuits built
+    directly on physical indices, which carry no layout.)
+
+    verbatim=True additionally wraps the gate body in
+    `#pragma braket verbatim / box { ... }`, telling Braket to run it EXACTLY
+    as written -- no Quilc recompilation, no gate cancellation. That is
+    mandatory for ZNE folding to survive, and it is only valid because
+    transpile_for_rigetti already produced native gates on real lattice
+    edges. Measurements stay OUTSIDE the box; Braket does not accept them
+    inside one.
     """
+    import re
     from qiskit import qasm3
 
+    if physical is None:
+        physical = verbatim
+
     src = qasm3.dumps(qc_hw, includes=(), basis_gates=BRAKET_BUILTIN_GATES)
-    if not verbatim:
+
+    if not physical and not verbatim:
         return src
 
-    import re
+    def to_phys(s: str) -> str:
+        return re.sub(r"\bq\[(\d+)\]", r"$\1", s)
 
-    header, body = [], []
-    for line in src.splitlines():
-        stripped = line.strip()
-        if (stripped.startswith("OPENQASM") or stripped.startswith("include")
-                or re.match(r"(qubit|bit)\b", stripped)
-                or re.match(r"(qubit|bit)\[", stripped)):
+    header, gates, measures = [], [], []
+    for raw in src.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("OPENQASM") or line.startswith("include"):
             header.append(line)
+        elif re.match(r"qubit\b|qubit\[", line):
+            # Physical addressing declares no quantum register.
             continue
-        if not stripped:
-            continue
-        body.append(stripped)
+        elif re.match(r"bit\b|bit\[", line):
+            header.append(line)
+        elif "measure" in line:
+            measures.append(to_phys(line))
+        else:
+            gates.append(to_phys(line))
 
-    # Verbatim boxes address physical qubits; measurement must sit OUTSIDE the
-    # box (Braket rejects measure inside a verbatim box).
-    gates   = [l for l in body if not l.startswith("c[") and "measure" not in l]
-    measures = [l for l in body if "measure" in l]
-
-    phys = lambda s: re.sub(r"\bq\[(\d+)\]", r"$\1", s)
-
-    out = [l for l in header if not re.match(r"\s*qubit", l)]
-    out.append("#pragma braket verbatim")
-    out.append("box {")
-    out += ["  " + phys(g) for g in gates]
-    out.append("}")
-    out += [phys(m) for m in measures]
+    out = list(header)
+    if verbatim:
+        out.append("#pragma braket verbatim")
+        out.append("box {")
+        out += ["  " + g for g in gates]
+        out.append("}")
+    else:
+        out += gates
+    out += measures
     return "\n".join(out) + "\n"
 
 
-# ── Job logging ───────────────────────────────────────────────────────────────
+# -- Job logging ---------------------------------------------------------------
 
 def append_job_log(results_dir: str, record: dict) -> str:
     """Append one JSON record per line to <results_dir>/job_log.txt."""
@@ -541,18 +697,24 @@ def encode_unitary(U: np.ndarray) -> dict:
     return {"shape": list(U.shape), "real": U.real.tolist(), "imag": U.imag.tolist()}
 
 
-# ── Reporting ─────────────────────────────────────────────────────────────────
+# -- Reporting -----------------------------------------------------------------
 
 def print_circuit_report(title: str, profile: dict, n_shots: int,
-                         n_logical_qubits: int, caps_are_real: bool) -> dict:
-    """Human-readable circuit + cost report. Returns the runtime estimate."""
+                         n_logical_qubits: int, caps_are_real: bool,
+                         qubit_formula: str = "n_targ + 2*n_prec") -> dict:
+    """
+    Human-readable circuit + cost report. Returns the runtime estimate.
+
+    `qubit_formula` is just the label: the two-stage QPUF needs
+    n_targ + 2*n_prec qubits, plain QPE needs n_targ + n_prec.
+    """
     rt  = estimate_runtime_s(profile, n_shots)
     fid = estimate_fidelity(profile)
 
     print("-" * 78)
     print(title)
     print("-" * 78)
-    print(f"  logical qubits (n_targ + 2*n_prec) : {n_logical_qubits}")
+    print(f"  logical qubits ({qubit_formula}){' ' * max(0, 18 - len(qubit_formula))}: {n_logical_qubits}")
     print(f"  physical qubits touched            : {profile['n_qubits_used']}")
     print(f"  1-qubit gates (rz + rx)            : {profile['n_1q']:,}")
     print(f"  2-qubit gates (cz)                 : {profile['n_2q']:,}")
@@ -567,6 +729,6 @@ def print_circuit_report(title: str, profile: dict, n_shots: int,
     print(f"  est. runtime (parallel/realistic)  : {fmt_time(rt['t_parallel_s'])}")
     print(f"  est. runtime (serial/upper bound)  : {fmt_time(rt['t_serial_s'])}")
     if not caps_are_real:
-        print("  NOTE: using PLACEHOLDER lattice — run query_device_caps.py on the")
+        print("  NOTE: using PLACEHOLDER lattice -- run query_device_caps.py on the")
         print("        DCV first so routing reflects the real Cepheus topology.")
     return rt

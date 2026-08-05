@@ -52,7 +52,7 @@ def main():
 
     caps = fetch_device_caps(device)
 
-    # ── Connectivity summary ──────────────────────────────────────────────────
+    # -- Connectivity summary --------------------------------------------------
     graph = caps["connectivity"]
     if graph:
         degrees = [len(v) for v in graph.values()]
@@ -67,7 +67,7 @@ def main():
         print("=== connectivity ===\n  (device reports no connectivityGraph)")
     print()
 
-    # ── OpenQASM action flags ─────────────────────────────────────────────────
+    # -- OpenQASM action flags -------------------------------------------------
     print("=== braket.ir.openqasm.program ===")
     for k, v in caps["openqasm"].items():
         if isinstance(v, list) and len(v) > 12:
@@ -81,10 +81,10 @@ def main():
     if not verbatim_ok:
         print("      WARNING: without verbatim, Rigetti's Quilc recompiles the")
         print("      circuit and will CANCEL the C^dag C pairs that ZNE folding")
-        print("      inserts — every lambda collapses back to 1 and ZNE is void.")
+        print("      inserts -- every lambda collapses back to 1 and ZNE is void.")
     print()
 
-    # ── Calibration data ──────────────────────────────────────────────────────
+    # -- Calibration data ------------------------------------------------------
     specs = getattr(getattr(props, "provider", None), "specs", None)
     if specs:
         print("=== calibration (from provider.specs) ===")
@@ -121,7 +121,7 @@ def main():
                                        "T2_s": statistics.median(t2) if t2 else None}
         print()
 
-    # ── reset / MCM probe ─────────────────────────────────────────────────────
+    # -- reset / MCM probe -----------------------------------------------------
     dump = props.json() if hasattr(props, "json") else json.dumps(props.dict())
     hits = [tok.strip() for tok in dump.split(",")
             if "reset" in tok.lower() or "midcircuit" in tok.lower()]
@@ -129,7 +129,7 @@ def main():
     for h in hits[:20]:
         print(f"  {h}")
     if not hits:
-        print("  (none — no mid-circuit measurement / reset; the QPUF must use")
+        print("  (none -- no mid-circuit measurement / reset; the QPUF must use")
         print("   the deferred-measurement two-register form, which is what")
         print("   build_qpuf_two_stage() does.)")
     print()
