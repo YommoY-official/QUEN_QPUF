@@ -138,7 +138,38 @@ class ErrorMitigation:
         self._coupling  = coupling_map_from_caps(caps)
         self._neighbors = self._build_neighbors(caps)
         self._chiplets  = None
-        self._route_cache: dict = {}
+
+    # =====================================================================
+    # Provenance
+    # =====================================================================
+    #
+    # Every transform records what it did into ONE dict carried on the
+    # circuit, and each stage inherits the previous stage's entries. Three
+    # independent attributes would not survive the pipeline: folding rebuilds
+    # the circuit from scratch, so a placement record written before DDD
+    # would be gone by the time the task is logged -- exactly where the run
+    # log needs the layout, the chiplet, and the pulse counts.
+
+    @staticmethod
+    def _get_meta(qc: QuantumCircuit | None) -> dict:
+        return dict(getattr(qc, "_em", {}) or {}) if qc is not None else {}
+
+    @classmethod
+    def _set_meta(cls, qc: QuantumCircuit, key: str, value: dict,
+                  inherit_from: QuantumCircuit | None = None) -> QuantumCircuit:
+        meta = cls._get_meta(inherit_from if inherit_from is not None else qc)
+        meta[key] = value
+        qc._em = meta
+        return qc
+
+    @classmethod
+    def provenance(cls, qc: QuantumCircuit) -> dict:
+        """
+        Everything every transform did to this circuit. Log this with the
+        task: placement layout + chiplet, DD sequence + pulse count, ZNE
+        scale + method.
+        """
+        return cls._get_meta(qc)
 
     # =====================================================================
     # Timing model
@@ -323,6 +354,7 @@ class ErrorMitigation:
             print(f"  placement: {n} qubits > {CHIPLET_SIZE}-qubit chiplet -- "
                   f"spilling across a boundary is unavoidable; minimising it.")
 
+        route_cache: dict = {}
         candidates = self._candidate_layouts(n, hub_qubits, sites_per_chiplet)
         if not candidates:
             raise RuntimeError("no candidate placement found for "
@@ -330,7 +362,7 @@ class ErrorMitigation:
 
         best = None
         for layout in candidates:
-            routed = self._route(qc, layout, optimization_level, seed_transpiler)
+            routed = self._route(qc, layout, optimization_level, seed_transpiler, route_cache)
             score  = self._score(routed)
             if score["n_intermodule"] > 0 and not allow_intermodule:
                 continue
@@ -342,14 +374,14 @@ class ErrorMitigation:
             # Every chiplet-local candidate spilled. Fall back to allowing it,
             # but report the count rather than hiding it.
             for layout in candidates:
-                routed = self._route(qc, layout, optimization_level, seed_transpiler)
+                routed = self._route(qc, layout, optimization_level, seed_transpiler, route_cache)
                 score  = self._score(routed)
                 key = (score["n_intermodule"], -score["log_fidelity"])
                 if best is None or key < best[0]:
                     best = (key, routed, score, layout)
 
         _, routed, score, layout = best
-        routed._em_placement = {          # consumed by placement_report()
+        meta = {
             "initial_layout":  layout,
             "hub_qubits":      hub_qubits,
             "chiplet_ids":     sorted({self.chiplet_of(q) for q in layout}),
@@ -361,6 +393,7 @@ class ErrorMitigation:
             "candidates_tried": len(candidates),
             "calibration":     "live" if self.caps.get("specs") else "defaults",
         }
+        self._set_meta(routed, "placement", meta)
         if verbose:
             self.print_placement_report(routed)
         return routed
@@ -427,18 +460,28 @@ class ErrorMitigation:
         return out[:n]
 
     def _route(self, qc: QuantumCircuit, layout: list[int],
-               optimization_level: int, seed: int) -> QuantumCircuit:
-        key = (id(qc), tuple(layout), optimization_level, seed)
-        if key not in self._route_cache:
-            self._route_cache[key] = transpile(
-                qc,
-                basis_gates=self.basis + ["measure"],
-                coupling_map=self._coupling,
-                initial_layout=layout,
-                optimization_level=optimization_level,
-                seed_transpiler=seed,
-            )
-        return self._route_cache[key]
+               optimization_level: int, seed: int,
+               cache: dict | None = None) -> QuantumCircuit:
+        """
+        Route `qc` onto `layout`. `cache` is scoped to ONE select_best_qubits
+        call, deliberately: an instance-level cache keyed on id(qc) is unsafe,
+        because CPython reuses object ids after garbage collection, so a
+        transient circuit could hand back another circuit's routing.
+        """
+        key = (tuple(layout), optimization_level, seed)
+        if cache is not None and key in cache:
+            return cache[key]
+        routed = transpile(
+            qc,
+            basis_gates=self.basis + ["measure"],
+            coupling_map=self._coupling,
+            initial_layout=layout,
+            optimization_level=optimization_level,
+            seed_transpiler=seed,
+        )
+        if cache is not None:
+            cache[key] = routed
+        return routed
 
     def _score(self, routed: QuantumCircuit) -> dict:
         """
@@ -473,7 +516,7 @@ class ErrorMitigation:
 
     def placement_report(self, qc: QuantumCircuit) -> dict | None:
         """Placement metadata attached by select_best_qubits (log this)."""
-        return getattr(qc, "_em_placement", None)
+        return self._get_meta(qc).get("placement")
 
     def print_placement_report(self, qc: QuantumCircuit) -> None:
         rep = self.placement_report(qc)
@@ -646,14 +689,14 @@ class ErrorMitigation:
             for op, qargs, cargs in layer_ops[i]:
                 out.append(op, qargs, cargs)
 
-        out._em_ddd = {
+        self._set_meta(out, "ddd", {
             "sequence":     sequence,
             "n_windows":    n_windows,
             "n_pulses":     n_pulses,
             "n_gates_added": out.size() - qc.size(),
             "min_idle_s":   min_idle_s,
             "crowded_windows": crowded,
-        }
+        }, inherit_from=qc)
         if verbose:
             print(f"  --- DDD ({sequence}) ---")
             print(f"    idle windows filled : {n_windows}")
@@ -716,7 +759,7 @@ class ErrorMitigation:
                 raise ValueError(f"unsupported DD pulse gate {name!r}")
 
     def ddd_report(self, qc: QuantumCircuit) -> dict | None:
-        return getattr(qc, "_em_ddd", None)
+        return self._get_meta(qc).get("ddd")
 
     @classmethod
     def verify_sequences(cls, tol: float = 1e-9) -> dict[str, dict]:
@@ -835,8 +878,10 @@ class ErrorMitigation:
                 out.append(inst.operation,           inst.qubits, inst.clbits)
 
         folded = self._reattach_measurements(qc, out)
-        folded._em_zne = {"scale": scale, "method": method,
-                          "two_qubit_only": two_qubit_only, "seed": seed}
+        self._set_meta(folded, "zne",
+                       {"scale": scale, "method": method,
+                        "two_qubit_only": two_qubit_only, "seed": seed},
+                       inherit_from=qc)
         return folded
 
     def _fold_global(self, qc: QuantumCircuit, scale: int) -> QuantumCircuit:
@@ -846,8 +891,10 @@ class ErrorMitigation:
             folded.compose(base.inverse(), inplace=True)
             folded.compose(base,           inplace=True)
         out = self._reattach_measurements(qc, folded)
-        out._em_zne = {"scale": scale, "method": "global",
-                       "two_qubit_only": False, "seed": None}
+        self._set_meta(out, "zne",
+                       {"scale": scale, "method": "global",
+                        "two_qubit_only": False, "seed": None},
+                       inherit_from=qc)
         return out
 
     @staticmethod
@@ -960,8 +1007,10 @@ class ErrorMitigation:
                 if bit:
                     circ.rx(math.pi, q)          # native X
                 circ.measure(q, k)
-            circ._em_rem = {"model": model, "label": label,
-                            "prepared_bits": bits, "physical_qubits": phys}
+            self._set_meta(circ, "rem", {"model": model, "label": label,
+                                         "prepared_bits": bits,
+                                         "physical_qubits": phys},
+                           inherit_from=qc)
             out.append((label, circ))
         return out
 

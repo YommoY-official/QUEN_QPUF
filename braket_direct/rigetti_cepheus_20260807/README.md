@@ -28,6 +28,7 @@ out on-demand and are billed per task instead of against the reservation.
 |---|---|
 | `rigetti_qpuf_common.py` | circuit builders, routing, runtime model — shared by everything else |
 | `error_mitig.py` | `ErrorMitigation` class: chiplet-local placement, DDD, ZNE folding, REM calibration circuits, verification |
+| `mitig_analysis.py` | estimator half: P_correct, REM inversion, ZNE extrapolation, bootstrap CIs. `python mitig_analysis.py --validate` runs every technique in noisy simulation |
 | `query_device_caps.py` | dumps live device caps, writes `device_caps.json` |
 | `submit_test.py` | tiny end-to-end pipeline test (local sim / SV1 / QPU / reservation) |
 | `submit_qpe.py` | **plain single-stage QPE** with/without mitigation; prompts for N_PREC / N_TARG / shots / mitigation / input state |
