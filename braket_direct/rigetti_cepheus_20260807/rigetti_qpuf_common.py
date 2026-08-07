@@ -60,6 +60,7 @@ Why this differs from the IonQ (Forte-Enterprise-1) scripts
 
 import json
 import os
+import sys
 
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
@@ -1007,6 +1008,54 @@ def report_reservation(task, expected_arn: str) -> None:
     else:
         print("  Reservation : could not read back association from task "
               "metadata -- verify on the Braket console before continuing")
+
+
+def confirm_submit(question: str, assume_yes: bool = False) -> bool:
+    """
+    Final go/no-go before anything is billed. True means submit.
+
+    Why this is not a bare input(): the old version mapped EVERY non-"y"
+    outcome onto the same silent "Aborted -- nothing submitted." That message
+    cannot distinguish
+        - you deliberately declined,
+        - you pressed Enter (the default is No),
+        - stdin was not a terminal, so the question was never asked and
+          EOFError answered it for you.
+    The last case is the nasty one: piping or redirecting stdin makes every
+    prompt in the script fall through to its default, and the run dies at the
+    end having silently ignored your configuration. Name which one happened.
+    """
+    if assume_yes:
+        print(f"\n{question} y   (--yes)")
+        return True
+
+    if not sys.stdin.isatty():
+        print(f"\n{question}")
+        print("\nERROR: stdin is not a terminal, so this question cannot be "
+              "answered interactively.")
+        print("       Every prompt in this run fell back to its DEFAULT, which "
+              "is probably not what you configured.")
+        print("       Re-run directly in a terminal, or pass --yes to submit "
+              "without the prompt.")
+        return False
+
+    try:
+        answer = input(question).strip().lower()
+    except EOFError:
+        print("\n\nERROR: end of input while waiting for confirmation "
+              "(stdin closed).")
+        print("       Re-run in a terminal, or pass --yes to skip the prompt.")
+        return False
+
+    if answer in ("y", "yes"):
+        return True
+
+    if answer == "":
+        print("Aborted -- nothing submitted. (Enter alone means No here; "
+              "type 'y' to submit, or pass --yes.)")
+    else:
+        print(f"Aborted -- nothing submitted. (Got {answer!r}, expected 'y'.)")
+    return False
 
 
 # -- Job logging ---------------------------------------------------------------
