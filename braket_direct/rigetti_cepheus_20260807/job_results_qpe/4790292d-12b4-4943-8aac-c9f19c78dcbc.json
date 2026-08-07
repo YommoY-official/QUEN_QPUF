@@ -1,0 +1,203 @@
+{
+  "job_id": "arn:aws:braket:us-west-1:767397707562:quantum-task/4790292d-12b4-4943-8aac-c9f19c78dcbc",
+  "datetime": "2026-08-07T12:51:28.810528+00:00",
+  "qpu": "Cepheus-1-108Q",
+  "device_arn": "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
+  "submission": "reservation",
+  "reservation_arn": "arn:aws:braket:us-west-1:767397707562:reservation/339f1ef2-2aec-459e-8e09-8a945b52755a",
+  "circuit_type": "QPE_2targ",
+  "role": "readout_cal",
+  "label": "readout calibration cal0",
+  "cal_state": "cal0",
+  "zne_scale": 1,
+  "zne_scales_all": [
+    1,
+    3,
+    5
+  ],
+  "error_mitigation": "both",
+  "ddd_sequence": "none",
+  "ddd_report": null,
+  "batch_id": "20260807T125101Z",
+  "verbatim": true,
+  "n_stages": 1,
+  "state_mode": "known",
+  "phi": 0.125,
+  "ideal_bin": 8.0,
+  "ideal_distribution": {
+    "8": 0.9999999999999978
+  },
+  "n_prec": 6,
+  "n_targ": 2,
+  "n_qubits": 8,
+  "physical_qubits": [
+    90,
+    91,
+    92,
+    93,
+    94,
+    95
+  ],
+  "clbit_to_phys": [
+    92,
+    93,
+    91,
+    94,
+    90,
+    95
+  ],
+  "n_shots": 10000,
+  "n_1q_gates": 0,
+  "n_2q_gates": 0,
+  "n_gates": 0,
+  "n_measurements": 6,
+  "depth": 1,
+  "depth_2q": 0,
+  "est_fidelity": 1.0,
+  "est_runtime_parallel_s": 17.0204,
+  "est_runtime_serial_s": 17.02,
+  "placement": {
+    "initial_layout": [
+      92,
+      91,
+      93,
+      90,
+      94,
+      95,
+      96,
+      97
+    ],
+    "chiplet_ids": [
+      10
+    ],
+    "n_intermodule": 0,
+    "n_swap_pairs": 30,
+    "est_fidelity": 0.01433655325417524,
+    "calibration": "live"
+  },
+  "seed": 10,
+  "target_init_seed": 99,
+  "unitary": {
+    "shape": [
+      4,
+      4
+    ],
+    "real": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.9238795325112867,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.9238795325112867,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.7071067811865475
+      ]
+    ],
+    "imag": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.3826834323650898,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.3826834323650898,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.7071067811865476
+      ]
+    ]
+  },
+  "completed_at": "2026-08-07T12:51:35.843000+00:00",
+  "task_time_seconds": 7.12,
+  "wall_time_seconds": 7.032472,
+  "qpu_time_seconds": null,
+  "n_shots_requested": 10000,
+  "measured_qubits": [
+    92,
+    93,
+    91,
+    94,
+    90,
+    95
+  ],
+  "counts": {
+    "000000": 9116,
+    "100000": 368,
+    "010000": 162,
+    "000010": 115,
+    "001000": 101,
+    "000100": 33,
+    "100001": 2,
+    "100100": 3,
+    "000001": 59,
+    "110000": 9,
+    "010001": 1,
+    "011000": 5,
+    "010010": 2,
+    "100010": 5,
+    "001100": 1,
+    "001010": 4,
+    "000011": 3,
+    "010100": 2,
+    "010101": 2,
+    "000101": 2,
+    "101000": 3,
+    "000110": 1,
+    "011100": 1
+  },
+  "native_quil_metadata": null,
+  "additional_metadata": {
+    "action": {
+      "braketSchemaHeader": {
+        "name": "braket.ir.openqasm.program",
+        "version": "1"
+      },
+      "source": "OPENQASM 3.0;\nbit[6] c;\n#pragma braket verbatim\nbox {\n}\nc[0] = measure $92;\nc[1] = measure $93;\nc[2] = measure $91;\nc[3] = measure $94;\nc[4] = measure $90;\nc[5] = measure $95;\n",
+      "inputs": null
+    },
+    "aqtMetadata": null,
+    "dwaveMetadata": null,
+    "ionqMetadata": null,
+    "rigettiMetadata": {
+      "braketSchemaHeader": {
+        "name": "braket.task_result.rigetti_metadata",
+        "version": "1"
+      },
+      "nativeQuilMetadata": null,
+      "compiledProgram": "PRAGMA INITIAL_REWIRING \"NAIVE\"\nDECLARE ro BIT[6]\nPRAGMA PRESERVE_BLOCK\nPRAGMA END_PRESERVE_BLOCK\nMEASURE 92 ro[0]\nMEASURE 93 ro[1]\nMEASURE 91 ro[2]\nMEASURE 94 ro[3]\nMEASURE 90 ro[4]\nMEASURE 95 ro[5]"
+    },
+    "oqcMetadata": null,
+    "xanaduMetadata": null,
+    "queraMetadata": null,
+    "simulatorMetadata": null,
+    "iqmMetadata": null
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "job_id": "arn:aws:braket:us-west-1:767397707562:quantum-task/e4f16d75-3994-42a8-8bd7-669721d36e24",
+  "datetime": "2026-08-07T12:51:55.586879+00:00",
+  "qpu": "Cepheus-1-108Q",
+  "device_arn": "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
+  "submission": "reservation",
+  "reservation_arn": "arn:aws:braket:us-west-1:767397707562:reservation/339f1ef2-2aec-459e-8e09-8a945b52755a",
+  "circuit_type": "QPE_1targ",
+  "role": "readout_cal",
+  "label": "readout calibration cal1",
+  "cal_state": "cal1",
+  "zne_scale": 1,
+  "zne_scales_all": [
+    1,
+    3,
+    5
+  ],
+  "error_mitigation": "both",
+  "ddd_sequence": "none",
+  "ddd_report": null,
+  "batch_id": "20260807T125134Z",
+  "verbatim": true,
+  "n_stages": 1,
+  "state_mode": "known",
+  "phi": 0.125,
+  "ideal_bin": 8.0,
+  "ideal_distribution": {
+    "8": 0.9999999999999987
+  },
+  "n_prec": 6,
+  "n_targ": 1,
+  "n_qubits": 7,
+  "physical_qubits": [
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "clbit_to_phys": [
+    14,
+    13,
+    15,
+    12,
+    11,
+    10
+  ],
+  "n_shots": 10000,
+  "n_1q_gates": 6,
+  "n_2q_gates": 0,
+  "n_gates": 6,
+  "n_measurements": 6,
+  "depth": 2,
+  "depth_2q": 0,
+  "est_fidelity": 0.994014980014994,
+  "est_runtime_parallel_s": 17.0208,
+  "est_runtime_serial_s": 17.0224,
+  "placement": {
+    "initial_layout": [
+      13,
+      12,
+      14,
+      11,
+      15,
+      10,
+      9
+    ],
+    "chiplet_ids": [
+      1
+    ],
+    "n_intermodule": 0,
+    "n_swap_pairs": 27,
+    "est_fidelity": 0.19734685490083753,
+    "calibration": "live"
+  },
+  "seed": 10,
+  "target_init_seed": 99,
+  "unitary": {
+    "shape": [
+      2,
+      2
+    ],
+    "real": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.7071067811865476
+      ]
+    ],
+    "imag": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.7071067811865475
+      ]
+    ]
+  },
+  "completed_at": "2026-08-07T12:51:58.862000+00:00",
+  "task_time_seconds": 3.362,
+  "wall_time_seconds": 3.275121,
+  "qpu_time_seconds": null,
+  "n_shots_requested": 10000,
+  "measured_qubits": [
+    14,
+    13,
+    15,
+    12,
+    11,
+    10
+  ],
+  "counts": {
+    "101111": 528,
+    "111111": 5963,
+    "111001": 42,
+    "111110": 445,
+    "110111": 280,
+    "111011": 1452,
+    "011111": 200,
+    "110011": 61,
+    "111101": 501,
+    "111100": 31,
+    "110101": 26,
+    "101110": 39,
+    "010011": 5,
+    "100111": 22,
+    "011110": 18,
+    "111010": 91,
+    "011011": 46,
+    "101001": 5,
+    "101011": 106,
+    "101101": 35,
+    "110110": 17,
+    "011101": 21,
+    "001111": 11,
+    "110010": 5,
+    "011100": 1,
+    "011010": 5,
+    "110001": 3,
+    "010111": 11,
+    "001011": 5,
+    "010001": 1,
+    "111000": 3,
+    "101010": 7,
+    "101100": 2,
+    "100101": 2,
+    "001110": 1,
+    "011001": 2,
+    "100011": 2,
+    "100010": 3,
+    "100110": 1,
+    "010110": 1
+  },
+  "native_quil_metadata": null,
+  "additional_metadata": {
+    "action": {
+      "braketSchemaHeader": {
+        "name": "braket.ir.openqasm.program",
+        "version": "1"
+      },
+      "source": "OPENQASM 3.0;\nbit[6] c;\n#pragma braket verbatim\nbox {\n  rx(pi) $14;\n  rx(pi) $13;\n  rx(pi) $15;\n  rx(pi) $12;\n  rx(pi) $11;\n  rx(pi) $10;\n}\nc[0] = measure $14;\nc[1] = measure $13;\nc[2] = measure $15;\nc[3] = measure $12;\nc[4] = measure $11;\nc[5] = measure $10;\n",
+      "inputs": null
+    },
+    "aqtMetadata": null,
+    "dwaveMetadata": null,
+    "ionqMetadata": null,
+    "rigettiMetadata": {
+      "braketSchemaHeader": {
+        "name": "braket.task_result.rigetti_metadata",
+        "version": "1"
+      },
+      "nativeQuilMetadata": null,
+      "compiledProgram": "PRAGMA INITIAL_REWIRING \"NAIVE\"\nDECLARE ro BIT[6]\nPRAGMA PRESERVE_BLOCK\nRX(3.141592653589793) 14\nRX(3.141592653589793) 13\nRX(3.141592653589793) 15\nRX(3.141592653589793) 12\nRX(3.141592653589793) 11\nRX(3.141592653589793) 10\nPRAGMA END_PRESERVE_BLOCK\nMEASURE 14 ro[0]\nMEASURE 13 ro[1]\nMEASURE 15 ro[2]\nMEASURE 12 ro[3]\nMEASURE 11 ro[4]\nMEASURE 10 ro[5]"
+    },
+    "oqcMetadata": null,
+    "xanaduMetadata": null,
+    "queraMetadata": null,
+    "simulatorMetadata": null,
+    "iqmMetadata": null
+  }
+}
