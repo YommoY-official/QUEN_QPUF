@@ -50,7 +50,7 @@ from rigetti_qpuf_common import (
     DEVICE_NAME, DEVICE_ARN, RES_ARN,
     F1Q, F2Q,
     haar_random_unitary, build_qpuf_two_stage,
-    load_device_caps, transpile_for_rigetti, count_native,
+    load_device_caps, transpile_for_rigetti, place_and_route, count_native, placement_record,
     check_qubits_on_device, native_gate_violations,
     measured_physical_qubits, fold_global, readout_calibration_circuits,
     to_braket_qasm, append_job_log, encode_unitary,
@@ -162,6 +162,12 @@ def viability_table(n_targ: int, caps: dict, n_shots: int, n_prec_max: int = 6):
     the all-to-all 2q count, because there is room to spread out. The column
     that actually bites is `est F` -- the QPUF dies of gate infidelity long
     before it runs out of qubits or connectivity.
+
+    Uses the SAME place_and_route() the submission path uses, so the table
+    describes the circuit you would actually get. Routing it plainly here
+    would understate the 2q count (chiplet-local placement buys fewer weak
+    intermodule couplers by accepting more CZs) while overstating the
+    fidelity, which is the wrong way round for a go/no-go table.
     """
     rng = np.random.default_rng(seed=SEED)
     U   = haar_random_unitary(2 ** n_targ, rng=rng)
@@ -178,7 +184,7 @@ def viability_table(n_targ: int, caps: dict, n_shots: int, n_prec_max: int = 6):
 
     for npr in range(1, n_prec_max + 1):
         qc    = build_qpuf_two_stage(npr, n_targ, U, TARGET_INIT_SEED)
-        qc_hw = transpile_for_rigetti(qc, caps)
+        qc_hw = place_and_route(qc, caps, hub_qubits=list(range(n_targ)))
         prof  = count_native(qc_hw)
         rt    = estimate_runtime_s(prof, n_shots)
         fid   = estimate_fidelity(prof)
@@ -222,7 +228,11 @@ def main():
 
     print(f"Building + routing the base circuit (N_PREC={N_PREC}, N_TARG={N_TARG}) ...")
     qc    = build_qpuf_two_stage(N_PREC, N_TARG, U, TARGET_INIT_SEED)
-    qc_hw = transpile_for_rigetti(qc, caps)
+    # Chiplet-aware placement, on by default. The hub is the target register
+    # ([0, N_TARG) for build_qpuf_two_stage) -- BOTH QPE stages drive their
+    # controlled-U powers into it, so it is the busiest site in the circuit.
+    qc_hw = place_and_route(qc, caps, hub_qubits=list(range(N_TARG)),
+                            verbose=True)
     phys_qubits = measured_physical_qubits(qc_hw)
 
     print("\n" + "=" * 78)
@@ -389,6 +399,13 @@ def main():
                 "n_targ":            N_TARG,
                 "n_qubits":          n_logical,
                 "physical_qubits":   sorted(phys_qubits),
+                # UNSORTED, position = clbit index. This is the mapping the
+                # analysis needs: Braket orders the returned bitstring by
+                # ascending PHYSICAL qubit index, which after routing has no
+                # relation to clbit order, so reconstructing m requires
+                # clbit -> physical explicitly. `physical_qubits` above is
+                # sorted for readability and CANNOT be used for this.
+                "clbit_to_phys":     list(phys_qubits),
                 "n_shots":           N_SHOTS,
                 "n_1q_gates":        prof["n_1q"],
                 "n_2q_gates":        prof["n_2q"],
@@ -399,6 +416,7 @@ def main():
                 "est_fidelity":      estimate_fidelity(prof),
                 "est_runtime_parallel_s": job["runtime"]["t_parallel_s"],
                 "est_runtime_serial_s":   job["runtime"]["t_serial_s"],
+                "placement":         placement_record(qc_hw),
                 "seed":              SEED,
                 "target_init_seed":  TARGET_INIT_SEED,
                 "unitary":           encode_unitary(U),

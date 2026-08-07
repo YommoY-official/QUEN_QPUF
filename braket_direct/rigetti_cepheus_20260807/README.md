@@ -34,6 +34,41 @@ out on-demand and are billed per task instead of against the reservation.
 | `submit_qpe.py` | **plain single-stage QPE** with/without mitigation; prompts for N_PREC / N_TARG / shots / mitigation / input state |
 | `submit_qpuf_mitigation.py` | the two-stage QPUF run; prompts for N_PREC / N_TARG / shots / mitigation |
 | `checkRetrieve.py` | polls task status, saves counts + Rigetti native-Quil metadata to `<dir>/<uuid>.json` |
+| `cancel_tasks.py` | cancel tasks by job log, by reservation tag, or every queued task on the device. Dry run unless `--yes` |
+
+## Which results directory
+
+Each submit script writes its own, and `checkRetrieve.py` with no argument
+reads `job_results/`. Passing the wrong one is the usual cause of
+"contains no records" — the error now lists the directories that do have
+records.
+
+| script | writes | retrieve with |
+|---|---|---|
+| `submit_test.py` | `job_results_test/` | `python checkRetrieve.py job_results_test` |
+| `submit_qpe.py` | `job_results_qpe/` | `python checkRetrieve.py job_results_qpe` |
+| `submit_qpuf_mitigation.py` | `job_results/` | `python checkRetrieve.py` |
+
+## Cancelling
+
+Tasks carry a `ReservationRun` tag (see `RUN_TAG` in
+`rigetti_qpuf_common.py`) because Braket has no "list everything for
+reservation X" API — the tag is the only handle that finds them all.
+
+```bash
+python cancel_tasks.py --log job_results_qpe   # from recorded task ARNs
+python cancel_tasks.py --tag                   # everything tagged for this run
+python cancel_tasks.py --queued                # every cancellable task on Cepheus
+python cancel_tasks.py --tag --yes             # actually cancel
+```
+
+Every mode is a dry run until `--yes`. If a task's status cannot be read the
+script says so loudly and exits non-zero rather than reporting "nothing to
+cancel" — an unchecked task is not a cancelled one.
+
+Per the Braket Direct guidance: if the workload looks wrong, diagnose before
+cancelling. Idle tasks cost nothing extra, and a cancelled task returns no
+results.
 
 ## QPE vs QPUF
 

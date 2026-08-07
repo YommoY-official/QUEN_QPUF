@@ -60,7 +60,7 @@ from rigetti_qpuf_common import (
     DEVICE_NAME, DEVICE_ARN, RES_ARN,
     haar_random_unitary, known_phase_unitary,
     build_qpe_circuit, ideal_qpe_distribution,
-    load_device_caps, transpile_for_rigetti, count_native,
+    load_device_caps, transpile_for_rigetti, place_and_route, count_native, placement_record,
     check_qubits_on_device, native_gate_violations,
     measured_physical_qubits, fold_global, readout_calibration_circuits,
     to_braket_qasm, append_job_log, encode_unitary,
@@ -242,7 +242,11 @@ def main():
         print(f"WARNING: |U'U - I|_max = {err:.2e} (expected ~1e-15)")
 
     print(f"Building + routing QPE (N_PREC={N_PREC}, N_TARG={N_TARG}) ...")
-    qc_hw       = transpile_for_rigetti(qc, caps)
+    # Chiplet-aware placement, on by default. The hub is the target register
+    # ([0, N_TARG) for build_qpe_circuit) -- every controlled-U^(2^k) has to
+    # reach it, so where the hub sits drives the whole SWAP count.
+    qc_hw       = place_and_route(qc, caps, hub_qubits=list(range(N_TARG)),
+                                  verbose=True)
     phys_qubits = measured_physical_qubits(qc_hw)
 
     # -- Noiseless reference ---------------------------------------------------
@@ -423,6 +427,13 @@ def main():
                 "n_targ":            N_TARG,
                 "n_qubits":          n_logical,
                 "physical_qubits":   sorted(phys_qubits),
+                # UNSORTED, position = clbit index. This is the mapping the
+                # analysis needs: Braket orders the returned bitstring by
+                # ascending PHYSICAL qubit index, which after routing has no
+                # relation to clbit order, so reconstructing m requires
+                # clbit -> physical explicitly. `physical_qubits` above is
+                # sorted for readability and CANNOT be used for this.
+                "clbit_to_phys":     list(phys_qubits),
                 "n_shots":           N_SHOTS,
                 "n_1q_gates":        prof["n_1q"],
                 "n_2q_gates":        prof["n_2q"],
@@ -433,6 +444,7 @@ def main():
                 "est_fidelity":      estimate_fidelity(prof),
                 "est_runtime_parallel_s": job["runtime"]["t_parallel_s"],
                 "est_runtime_serial_s":   job["runtime"]["t_serial_s"],
+                "placement":         placement_record(qc_hw),
                 "seed":              SEED,
                 "target_init_seed":  TARGET_INIT_SEED,
                 "unitary":           encode_unitary(U),

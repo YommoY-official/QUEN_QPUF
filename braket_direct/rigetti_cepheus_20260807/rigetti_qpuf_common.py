@@ -602,6 +602,116 @@ def transpile_for_rigetti(qc: QuantumCircuit, caps: dict,
     return to_native_rx(qc_hw) if native_rx else qc_hw
 
 
+# Chiplet-aware placement is ON by default for every hardware submission.
+# Set QPUF_PLACEMENT=0 in the environment to fall back to plain SABRE routing
+# (useful as the control arm when measuring what placement is worth).
+PLACEMENT_DEFAULT = os.environ.get("QPUF_PLACEMENT", "1") not in ("0", "false", "no")
+
+
+def place_and_route(qc: QuantumCircuit, caps: dict,
+                    hub_qubits: list[int] | None = None,
+                    placement: bool | None = None,
+                    optimization_level: int = 2,
+                    seed_transpiler: int = 42,
+                    native_rx: bool = True,
+                    verbose: bool = False) -> QuantumCircuit:
+    """
+    THE routing entry point for anything headed to hardware: choose WHICH
+    physical qubits to use, then route onto them.
+
+    transpile_for_rigetti() only does the second half. Handing qiskit a bare
+    coupling map lets SABRE pick any qubits it likes, and SABRE optimises for
+    SWAP count with no idea that qubits differ in fidelity or that Cepheus is
+    twelve 9-qubit chiplets bridged by intermodule couplers -- the weakest
+    links on the chip (F2Q_INTERMODULE = 0.90 vs 0.97 for an on-chiplet CZ).
+    Left to itself it spreads a small register across three chiplets and pays
+    that penalty dozens of times.
+
+    Measured on the real lattice (device_caps.json, two-stage QPUF, N_TARG=1),
+    plain routing vs chiplet-aware placement:
+
+        N_PREC  logical    plain 2q / intermodule    placed 2q / intermodule    est F gain
+          2        5          17 /  8                   20 / 0                    x1.68
+          3        7          33 / 12                   41 / 0                    x1.94
+          4        9          59 / 31                   79 / 0                    x5.49
+          5       11          89 / 49                  137 / 8                    x4.82
+
+    Placement deliberately accepts MORE total CZs to buy zero intermodule
+    ones, and wins every time -- which is the whole argument for doing it.
+    Beyond 9 logical qubits a register cannot fit on one chiplet, so spilling
+    becomes unavoidable and the scorer only minimises it.
+
+    hub_qubits: virtual indices of the register every 2q gate must reach. For
+    both builders here the target register is [0, n_targ), and QPE's
+    interaction graph is a star centred on it. Inferred from the interaction
+    graph if omitted.
+
+    Falls back to plain routing (with a printed reason) if placement is
+    unavailable, so a submission never dies because the optimiser could not
+    run. Placement provenance is carried across the native-RX rewrite and
+    readable with ErrorMitigation.placement_report().
+    """
+    if placement is None:
+        placement = PLACEMENT_DEFAULT
+
+    if not placement:
+        return transpile_for_rigetti(qc, caps, optimization_level,
+                                     seed_transpiler, native_rx)
+
+    try:
+        # Imported lazily: error_mitig imports this module, so a module-level
+        # import here would be circular.
+        from error_mitig import ErrorMitigation
+        em = ErrorMitigation(caps)
+        placed = em.select_best_qubits(
+            qc, hub_qubits=hub_qubits,
+            optimization_level=optimization_level,
+            seed_transpiler=seed_transpiler,
+            verbose=verbose,
+        )
+    except Exception as e:
+        print(f"  NOTE: chiplet placement unavailable ({type(e).__name__}: {e});"
+              f" falling back to plain SABRE routing.")
+        return transpile_for_rigetti(qc, caps, optimization_level,
+                                     seed_transpiler, native_rx)
+
+    if not native_rx:
+        return placed
+
+    # to_native_rx builds a fresh circuit, so the placement record does not
+    # survive it on its own -- and that record is what the job log needs.
+    out = to_native_rx(placed)
+    meta = getattr(placed, "_em", None)
+    if meta is not None:
+        out._em = meta
+    return out
+
+
+def placement_record(qc_hw: QuantumCircuit) -> dict | None:
+    """
+    JSON-safe placement provenance for the job log, or None if the circuit was
+    routed without placement.
+
+    Worth logging with every task: which physical qubits a run used is not
+    recoverable from the counts afterwards, and it is exactly what you need to
+    tell "mitigation helped" apart from "that run happened to land on a better
+    chiplet". Folded ZNE circuits and REM calibration circuits inherit the
+    base circuit's placement, so log this once per submission batch.
+    """
+    meta = getattr(qc_hw, "_em", None)
+    if not meta or "placement" not in meta:
+        return None
+    rep = dict(meta["placement"])
+    return {
+        "initial_layout": [int(q) for q in rep.get("initial_layout", [])],
+        "chiplet_ids":    [c for c in rep.get("chiplet_ids", []) if c is not None],
+        "n_intermodule":  int(rep.get("n_intermodule", 0)),
+        "n_swap_pairs":   int(rep.get("n_swap_pairs", 0)),
+        "est_fidelity":   float(rep.get("est_fidelity", 0.0)),
+        "calibration":    rep.get("calibration"),
+    }
+
+
 def count_native(qc_hw: QuantumCircuit) -> dict:
     """
     Native-gate profile of a transpiled circuit.

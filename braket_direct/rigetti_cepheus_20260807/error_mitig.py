@@ -54,6 +54,7 @@ Rigetti specifics baked in
     the returned compiled program.
 """
 
+import heapq
 import math
 from collections import defaultdict
 
@@ -66,7 +67,7 @@ from qiskit.transpiler import CouplingMap
 from rigetti_qpuf_common import (
     RIGETTI_BASIS, ONE_QUBIT_TIME_S, TWO_QUBIT_TIME_S, READOUT_TIME_S,
     F1Q, F2Q, load_device_caps, coupling_map_from_caps, count_native,
-    measured_physical_qubits,
+    measured_physical_qubits, device_qubit_indices,
 )
 
 CHIPLET_SIZE = 9          # Cepheus-1-108Q: twelve 9-qubit chiplets, 3x4 array
@@ -198,12 +199,18 @@ class ErrorMitigation:
 
     @staticmethod
     def _build_neighbors(caps: dict) -> dict[int, set[int]]:
-        nbrs: dict[int, set[int]] = defaultdict(set)
+        """
+        Adjacency over the LIVE qubits. Every live qubit gets an entry, even
+        an isolated one, so callers can do set algebra on the result without
+        an empty-tuple default sneaking in (`.get(q, ()) & unassigned` raises
+        TypeError on a tuple).
+        """
+        nbrs: dict[int, set[int]] = {q: set() for q in device_qubit_indices(caps)}
         for a, vs in caps["connectivity"].items():
             for b in vs:
-                nbrs[int(a)].add(int(b))
-                nbrs[int(b)].add(int(a))
-        return dict(nbrs)
+                nbrs.setdefault(int(a), set()).add(int(b))
+                nbrs.setdefault(int(b), set()).add(int(a))
+        return nbrs
 
     def chiplets(self) -> dict[int, list[int]]:
         """
@@ -215,24 +222,36 @@ class ErrorMitigation:
         (different numbering convention, or a placeholder topology), we fall
         back to greedy BFS growth into connected blocks of 9, which gives a
         usable partition even if it is not the vendor's.
+
+        The partition is over the LIVE INDEX SET, never range(qubit_count).
+        Cepheus reports qubit_count=107 while its indices run 0..107 with 8
+        retired, so counting instead of indexing does two things at once: it
+        drops real qubit 107 off the end of the last chiplet, and it puts dead
+        qubit 8 into chiplet 0. Dead 8 is isolated in the graph, so chiplet 0
+        then fails the connectivity test, the CORRECT vendor partition is
+        discarded for all twelve chiplets, and the BFS fallback runs on a
+        qubit set that includes a qubit with no adjacency entry at all.
+        Restricted to live indices the vendor convention is exact: chiplet 0
+        is simply 8 qubits wide instead of 9.
         """
         if self._chiplets is not None:
             return self._chiplets
 
-        n = self.caps["qubit_count"]
-        by_index = {c: list(range(c * CHIPLET_SIZE,
-                                  min((c + 1) * CHIPLET_SIZE, n)))
-                    for c in range((n + CHIPLET_SIZE - 1) // CHIPLET_SIZE)}
+        live = sorted(device_qubit_indices(self.caps))
+
+        by_index: dict[int, list[int]] = {}
+        for q in live:
+            by_index.setdefault(q // CHIPLET_SIZE, []).append(q)
 
         if all(self._is_connected(g) for g in by_index.values()):
             self._chiplets = by_index
             return self._chiplets
 
         # Fallback: grow connected blocks of CHIPLET_SIZE by BFS.
-        unassigned = set(range(n))
+        unassigned = set(live)
         groups, cid = {}, 0
         while unassigned:
-            seed = min(unassigned, key=lambda q: len(self._neighbors.get(q, ())))
+            seed = min(unassigned, key=lambda q: len(self._neighbors.get(q, set())))
             block, frontier = [], [seed]
             while frontier and len(block) < CHIPLET_SIZE:
                 q = frontier.pop(0)
@@ -240,7 +259,7 @@ class ErrorMitigation:
                     continue
                 unassigned.discard(q)
                 block.append(q)
-                frontier += sorted(self._neighbors.get(q, ()) & unassigned)
+                frontier += sorted(self._neighbors.get(q, set()) & unassigned)
             groups[cid] = sorted(block)
             cid += 1
         self._chiplets = groups
@@ -255,7 +274,8 @@ class ErrorMitigation:
             if q in seen:
                 continue
             seen.add(q)
-            stack += [b for b in self._neighbors.get(q, ()) if b in want and b not in seen]
+            stack += [b for b in self._neighbors.get(q, set())
+                      if b in want and b not in seen]
         return seen == want
 
     def chiplet_of(self, qubit: int) -> int | None:
@@ -419,7 +439,7 @@ class ErrorMitigation:
         """
         layouts, seen = [], set()
         for _, qs in sorted(self.chiplets().items()):
-            ranked = sorted(qs, key=lambda q: -len(self._neighbors.get(q, ())))
+            ranked = sorted(qs, key=lambda q: -len(self._neighbors.get(q, set())))
             for anchor in ranked[:sites_per_chiplet]:
                 phys = self._bfs_order(anchor, n, prefer=set(qs))
                 if len(phys) < n:
@@ -442,21 +462,37 @@ class ErrorMitigation:
 
     def _bfs_order(self, start: int, n: int, prefer: set[int]) -> list[int]:
         """
-        BFS from `start`, taking qubits inside `prefer` (the chiplet) before
-        stepping outside it. That ordering is what makes the fallback rule
-        for n > 9 land the way the spec wants: the hub and its high-traffic
-        neighbours stay inside one chiplet, and only the last-added qubits
-        cross the boundary.
+        Grow a register of `n` qubits outward from `start`, taking qubits
+        inside `prefer` (the chiplet) before stepping outside it. That
+        ordering is what makes the fallback rule for n > 9 land the way the
+        spec wants: the hub and its high-traffic neighbours stay inside one
+        chiplet, and only the last-added qubits cross the boundary.
+
+        A plain FIFO queue does NOT implement that, which is the trap this
+        used to fall into. Sorting each expansion's neighbours by
+        (outside_prefer, -degree) orders only that one expansion; the queue
+        still comes out in hop order overall, so an out-of-chiplet qubit
+        enqueued at hop 1 is taken before an in-chiplet qubit enqueued at hop
+        2. Measured on the real lattice: for a 5-qubit register on 9-qubit
+        chiplets, that produced ZERO chiplet-local candidates out of 36 --
+        every single one spilled, so select_best_qubits could only ever choose
+        between placements that had already crossed a boundary, and the
+        `allow_intermodule=False` path was unreachable.
+
+        A priority queue keyed (outside_prefer, hop_depth, -degree) makes
+        chiplet membership dominate hop distance, which is what the paragraph
+        above actually describes.
         """
-        out, seen, frontier = [], {start}, [start]
-        while frontier and len(out) < n:
-            q = frontier.pop(0)
+        heap = [(0 if start in prefer else 1, 0,
+                 -len(self._neighbors.get(start, set())), start)]
+        out, seen = [], {start}
+        while heap and len(out) < n:
+            outside, depth, _, q = heapq.heappop(heap)
             out.append(q)
-            nbrs = sorted(self._neighbors.get(q, ()) - seen,
-                          key=lambda x: (x not in prefer, -len(self._neighbors.get(x, ()))))
-            for b in nbrs:
+            for b in sorted(self._neighbors.get(q, set()) - seen):
                 seen.add(b)
-                frontier.append(b)
+                heapq.heappush(heap, (0 if b in prefer else 1, depth + 1,
+                                      -len(self._neighbors.get(b, set())), b))
         return out[:n]
 
     def _route(self, qc: QuantumCircuit, layout: list[int],
@@ -535,6 +571,13 @@ class ErrorMitigation:
         print(f"    est. fidelity     : {rep['est_fidelity']:.4f}"
               f"   [{rep['calibration']} calibration]")
         print(f"    candidates tried  : {rep['candidates_tried']}")
+        if rep["calibration"] != "live":
+            print("    NOTE: device_caps.json carries no per-qubit/per-edge specs, so")
+            print("          every on-chiplet CZ scores the same F2Q default. Placement")
+            print("          can still avoid intermodule couplers (topology is known),")
+            print("          but it CANNOT tell a good chiplet from a bad one today.")
+            print("          Re-run query_device_caps.py with AWS access to populate")
+            print("          specs and get calibration-aware placement.")
 
     # ---------------------------------------------------------------------
 

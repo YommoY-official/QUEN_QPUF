@@ -61,10 +61,57 @@ def read_job_log(path: str) -> list[dict]:
             idx += 1
         if idx >= n:
             break
-        obj, end = decoder.raw_decode(text, idx)
+        try:
+            obj, end = decoder.raw_decode(text, idx)
+        except ValueError as e:
+            # A truncated final record (submit killed mid-write) must not cost
+            # you the records before it -- those task ARNs may be the only
+            # handle you have on tasks that are already running.
+            line = text.count("\n", 0, idx) + 1
+            print(f"WARNING: {path} is malformed at line {line} (byte {idx}): {e}")
+            print(f"         Keeping the {len(records)} record(s) parsed before "
+                  f"that point and ignoring the rest.")
+            break
         records.append(obj)
         idx = end
     return records
+
+
+def discover_logs(root: str) -> list[tuple[str, int]]:
+    """
+    Every job_results* directory under `root` that holds a job log, as
+    (dirname, n_records). Used to turn "that log is empty" into "...but these
+    other ones aren't", which is the actual question you are asking.
+    """
+    found = []
+    for name in sorted(os.listdir(root)):
+        path = os.path.join(root, name)
+        if not os.path.isdir(path) or not name.startswith("job_results"):
+            continue
+        log = os.path.join(path, "job_log.txt")
+        if os.path.exists(log):
+            try:
+                found.append((name, len(read_job_log(log))))
+            except Exception:
+                found.append((name, -1))
+    return found
+
+
+def print_log_hint(requested: str) -> None:
+    """Tell the user which logs DO have records, and how to read them."""
+    others = [(d, n) for d, n in discover_logs(HERE) if n > 0]
+    if not others:
+        print("\nNo job_results* directory here holds any records yet.")
+        print("Submit something first (submit_test.py / submit_qpe.py / "
+              "submit_qpuf_mitigation.py).")
+        return
+    print(f"\nThese logs DO have records (you asked for '{requested}'):")
+    for d, n in others:
+        print(f"    {d:<24} {n:>3} job(s)   ->  python checkRetrieve.py {d}")
+    print("\nEach submit script writes its own directory:")
+    print("    submit_test.py            -> job_results_test")
+    print("    submit_qpe.py             -> job_results_qpe")
+    print("    submit_qpuf_mitigation.py -> job_results   (the bare default)")
 
 
 def task_uuid(job_id: str) -> str:
@@ -279,13 +326,19 @@ def main():
     log_file    = os.path.join(results_dir, "job_log.txt")
 
     if not os.path.exists(log_file):
-        print(f"ERROR: {log_file} not found. Submit a job first.")
+        print(f"ERROR: {log_file} not found.")
+        print_log_hint(sub_dir)
         sys.exit(1)
 
     while True:
         records = read_job_log(log_file)
         if not records:
-            print("ERROR: job_log.txt is empty.")
+            # Name the PATH. Without it this reads as "the log you are looking
+            # at is empty", when what actually happened is almost always that
+            # the default directory was read instead of the one just written.
+            print(f"ERROR: {log_file} contains no records "
+                  f"({os.path.getsize(log_file)} bytes).")
+            print_log_hint(sub_dir)
             sys.exit(1)
 
         print(f"Found {len(records)} job(s) in {log_file}")

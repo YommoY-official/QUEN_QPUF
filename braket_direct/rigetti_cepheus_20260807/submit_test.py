@@ -46,7 +46,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rigetti_qpuf_common import (
     DEVICE_NAME, DEVICE_ARN, RES_ARN, RIGETTI_BASIS,
     haar_random_unitary, build_qpuf_two_stage,
-    load_device_caps, transpile_for_rigetti, count_native,
+    load_device_caps, transpile_for_rigetti, place_and_route, count_native, placement_record,
     check_qubits_on_device, native_gate_violations,
     to_braket_qasm, append_job_log, encode_unitary,
     task_tags, report_reservation,
@@ -131,7 +131,10 @@ def main():
 
     if on_hardware:
         # Route onto the real lattice; the result addresses physical qubits.
-        qc_hw = transpile_for_rigetti(qc, caps)
+        # Same chiplet-aware placement the real runs use -- the point of this
+        # script is that nothing but the size changes between here and there.
+        qc_hw = place_and_route(qc, caps, hub_qubits=list(range(N_TARG)),
+                                verbose=True)
     else:
         # Simulators have no lattice; routing onto 108 qubits would make the
         # statevector unsimulable. Decompose to the native basis only, so the
@@ -251,6 +254,7 @@ def main():
         "n_measurements":    profile["n_meas"],
         "depth":             profile["depth"],
         "depth_2q":          profile["depth_2q"],
+        "placement":         placement_record(qc_hw),
         "seed":              SEED,
         "target_init_seed":  TARGET_INIT_SEED,
         "unitary":           encode_unitary(U),
