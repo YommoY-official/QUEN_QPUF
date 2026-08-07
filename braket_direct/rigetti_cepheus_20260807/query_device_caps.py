@@ -32,19 +32,22 @@ here.
 Finding the calibration
 -----------------------
 The cached device_caps.json has real connectivity but specs = {}, so
-placement currently runs on topology alone. This script now tries each ARN in
-CALIBRATION_ARNS and keeps the first that returns a populated provider.specs,
-saying which one won -- rather than querying one endpoint and silently
-recording "no calibration". It also writes the untouched properties blob to
-device_properties_raw.json, so calibration published under an unexpected key
-is still on disk.
+placement currently runs on topology alone. Calibration comes off the SAME
+device ARN the submissions use -- there is no second endpoint to try. The
+reservation ARN is not one: it is account-scoped, names a booked window
+rather than hardware, and has no .properties.
 
-    python query_device_caps.py                 # try the built-in candidates
-    python query_device_caps.py --arn <ARN>     # force one (repeatable)
+This script writes the untouched properties blob to device_properties_raw.json
+alongside the parsed cache, so calibration published under a key the parser
+does not know about is still on disk, and it says plainly when specs comes
+back empty instead of recording that silently.
 
-Calibration is often only published while the device is AVAILABLE, so if
-every ARN comes back empty, try again inside the reservation window before
-concluding Rigetti does not publish it.
+    python query_device_caps.py                 # the device ARN
+    python query_device_caps.py --arn <ARN>     # override it
+
+Calibration is often only published while the device is AVAILABLE, so if it
+comes back empty, try again inside the reservation window before concluding
+Rigetti does not publish it.
 """
 
 import argparse
@@ -57,28 +60,6 @@ from braket.aws import AwsDevice
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rigetti_qpuf_common import DEVICE_ARN, CONN_CACHE, fetch_device_caps
-
-# ARNs to try, in order, when looking for LIVE CALIBRATION.
-#
-# device_caps.json came back with specs = {} -- real connectivity, no
-# per-qubit or per-edge fidelities -- which leaves the placement scorer
-# unable to tell a good chiplet from a bad one (it can only avoid intermodule
-# couplers, which is topology, not calibration). Rigetti publishes the
-# calibration through provider.specs, so the fix is to find the endpoint that
-# actually returns it.
-#
-# The second entry is the non-standard one: Braket device ARNs normally use
-# the `braket` service namespace, not `quantum`, and Cepheus is a us-west-1
-# device. The SDK does not validate either field -- AwsDevice.get_device_region
-# just splits the ARN on ":" and takes field 3 -- so this ARN is accepted
-# syntactically and simply opens a us-east-1 session. Whether AWS serves the
-# device from there is a server-side question this script answers empirically
-# rather than assuming: it tries each ARN and keeps the first that comes back
-# with a populated specs block.
-CALIBRATION_ARNS = [
-    DEVICE_ARN,
-    "arn:aws:quantum:us-east-1::device/qpu/rigetti/Cepheus-1-108Q",
-]
 
 RAW_DUMP = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         "device_properties_raw.json")
@@ -103,54 +84,23 @@ def _specs_of(props) -> dict:
     return {}
 
 
-def resolve_device(arns: list[str]):
-    """
-    Return (device, arn, specs) for the first ARN that yields CALIBRATION,
-    falling back to the first that merely resolves.
-
-    Reports every attempt. An ARN that resolves but returns no specs is not a
-    failure worth aborting on -- it still carries the connectivity graph the
-    routing depends on -- but it is worth saying out loud, because a silent
-    specs = {} is exactly how the placement scorer ended up running blind.
-    """
-    first_ok = None
-    for arn in arns:
-        try:
-            device = AwsDevice(arn)
-            props  = device.properties
-        except Exception as e:
-            print(f"  {arn}\n      -> FAILED ({type(e).__name__}: {str(e)[:160]})")
-            continue
-
-        specs = _specs_of(props)
-        n1 = len(specs.get("1Q", {}) or {})
-        n2 = len(specs.get("2Q", {}) or {})
-        if n1 or n2:
-            print(f"  {arn}\n      -> OK, calibration present (1Q: {n1}, 2Q: {n2})")
-            return device, arn, specs
-        print(f"  {arn}\n      -> resolved, but provider.specs is EMPTY")
-        if first_ok is None:
-            first_ok = (device, arn, specs)
-
-    if first_ok is None:
-        print("\nERROR: no ARN resolved. Check credentials, region, and that the")
-        print("       device name is current.")
-        sys.exit(1)
-    return first_ok
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--arn", action="append", metavar="ARN",
-                    help="device ARN to query (repeatable; overrides the "
-                         "built-in candidate list)")
+    ap.add_argument("--arn", default=DEVICE_ARN, metavar="ARN",
+                    help=f"device ARN to query (default: {DEVICE_ARN})")
     args = ap.parse_args()
 
-    arns = args.arn or CALIBRATION_ARNS
-    print("Resolving device / looking for live calibration ...\n")
-    device, arn, specs = resolve_device(arns)
-    props = device.properties
-    print(f"\nUsing   : {arn}")
+    # ONE device ARN, the same one the on-demand and reserved submissions use.
+    # RES_ARN is NOT an alternative to it: a reservation ARN is account-scoped
+    # and names a booked WINDOW, not hardware, so it has no .properties to read
+    # calibration from. That is why DirectReservation takes the device and the
+    # reservation as two separate arguments -- the reservation only decides
+    # which queue a task lands in.
+    arn = args.arn
+    print(f"Querying {arn} ...\n")
+    device = AwsDevice(arn)
+    props  = device.properties
+    specs  = _specs_of(props)
 
     print(f"name    : {device.name}")
     print(f"status  : {device.status}")
@@ -221,8 +171,9 @@ def main():
         print("    - ErrorMitigation.select_best_qubits scores all on-chiplet CZs")
         print("      identically, so it can avoid intermodule couplers but CANNOT")
         print("      pick the best-calibrated chiplet.")
-        print("  Try again inside the reservation window, or with --arn <other>;")
-        print("  calibration is often only published while the device is available.")
+        print("  Calibration is often only published while the device is AVAILABLE,")
+        print(f"  so try again inside the reservation window (status now: {device.status}).")
+        print(f"  Check {os.path.basename(RAW_DUMP)} for calibration under another key.")
         print()
     else:
         print("=== calibration (from provider.specs) ===")
