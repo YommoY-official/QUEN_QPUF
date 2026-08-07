@@ -406,6 +406,123 @@ def _placeholder_grid(n_qubits: int, width: int = 12) -> dict:
     return graph
 
 
+# A characteristic Rigetti could not measure is reported as a SENTINEL, not as
+# an absent entry: value = 0.5 with error = 1.0. Half is a coin flip -- for a
+# CZ or a 1q RB that means "this gate did not calibrate today", i.e. broken,
+# NOT "50% fidelity". Averaging those in would drag every median down, and
+# feeding one to the placement scorer as a real number would let it rank a
+# dead coupler as merely mediocre.
+_CAL_FAILED_VALUE = 0.5
+_CAL_FAILED_ERROR = 1.0
+
+
+def _is_failed(ch: dict) -> bool:
+    return (ch.get("error") == _CAL_FAILED_ERROR
+            or ch.get("value") == _CAL_FAILED_VALUE)
+
+
+def normalize_specs(raw: dict) -> tuple[dict, list[int], list[list[int]]]:
+    """
+    Translate Rigetti's QCS InstructionSetArchitecture into the flat
+    {"1Q": {q: {...}}, "2Q": {"a-b": {...}}} shape the fidelity lookups read.
+
+    Returns (specs, dead_qubits, dead_edges).
+
+    WHY THIS EXISTS
+    ---------------
+    The calibration Cepheus publishes is NOT the pyQuil-era specs dict this
+    code was written against. It arrives as an ISA:
+
+        specs["instructions"]  [{name: "CZ",      sites: [{node_ids: [a,b],
+                                  characteristics: [{name: "fCZ", value, error}]}]},
+                                {name: "MEASURE", sites: [{node_ids: [q],
+                                  characteristics: [{name: "fRO", value}]}]}, ...]
+        specs["benchmarks"]    [{name: "randomized_benchmark_1q", ...  -> fRB},
+                                {name: "FreeInversionRecovery",   ...  -> T1},
+                                {name: "FreeInductionDecay",      ...  -> T2}]
+        specs["architecture"]  {family: "Ankaa", nodes: [...], edges: [...]}
+
+    Nothing looks for `specs["2Q"]["0-1"]["fCZ"]` in that, so before this
+    translator every edge_fidelity / qubit_fidelity / readout_fidelity call
+    silently returned its hardcoded default -- the calibration was downloaded,
+    stored, and then completely ignored. Emitting the flat shape means every
+    existing consumer picks it up with no further changes.
+
+    Failed characteristics are EXCLUDED from specs and reported separately, so
+    medians stay honest and callers can avoid the broken hardware explicitly
+    rather than inheriting an optimistic default for it.
+    """
+    specs: dict = {"1Q": {}, "2Q": {}}
+    dead_qubits: set[int] = set()
+    dead_edges: set[tuple[int, int]] = set()
+
+    def _put(bucket: str, key: str, field: str, value) -> None:
+        specs[bucket].setdefault(key, {})[field] = value
+
+    for instr in raw.get("instructions") or []:
+        name = instr.get("name")
+        for site in instr.get("sites") or []:
+            ids = site.get("node_ids") or []
+            for ch in site.get("characteristics") or []:
+                cname = ch.get("name")
+                nids  = ch.get("node_ids") or ids
+                if ch.get("value") is None:
+                    continue
+                if name == "CZ" and len(nids) == 2:
+                    a, b = int(nids[0]), int(nids[1])
+                    if _is_failed(ch):
+                        dead_edges.add((min(a, b), max(a, b)))
+                    else:
+                        _put("2Q", f"{min(a,b)}-{max(a,b)}", cname, float(ch["value"]))
+                elif name == "MEASURE" and len(nids) == 1:
+                    if not _is_failed(ch):
+                        _put("1Q", str(int(nids[0])), cname, float(ch["value"]))
+
+    for bench in raw.get("benchmarks") or []:
+        bname = bench.get("name")
+        # f1QRB is what qubit_fidelity looks for; the isolated 1q RB is the
+        # right source for it. The SIMULTANEOUS variant measures crosstalk
+        # under parallel drive and is systematically lower -- kept under its
+        # own field rather than overwriting the isolated number.
+        field = {"randomized_benchmark_1q": "f1QRB",
+                 "randomized_benchmark_simultaneous_1q": "f1Q_simultaneous_RB",
+                 "FreeInversionRecovery": "T1",
+                 "FreeInductionDecay": "T2"}.get(bname)
+        if field is None:
+            continue
+        for site in bench.get("sites") or []:
+            ids = site.get("node_ids") or []
+            for ch in site.get("characteristics") or []:
+                nids = ch.get("node_ids") or ids
+                if ch.get("value") is None or len(nids) != 1:
+                    continue
+                q = int(nids[0])
+                if _is_failed(ch):
+                    if field == "f1QRB":
+                        dead_qubits.add(q)
+                    continue
+                _put("1Q", str(q), field, float(ch["value"]))
+
+    return specs, sorted(dead_qubits), [list(e) for e in sorted(dead_edges)]
+
+
+def _apply_normalized_specs(caps: dict) -> dict:
+    """
+    Rewrite caps["specs"] in place if it is still in ISA form. Done on LOAD as
+    well as on fetch, so a device_caps.json cached before this translator
+    existed becomes usable without re-querying AWS.
+    """
+    raw = caps.get("specs") or {}
+    if not isinstance(raw, dict) or not ({"instructions", "benchmarks"} & set(raw)):
+        return caps          # already flat, or genuinely empty
+    specs, dead_q, dead_e = normalize_specs(raw)
+    caps["specs"] = specs
+    caps["dead_qubits"] = dead_q
+    caps["dead_edges"] = dead_e
+    caps["specs_isa"] = raw  # keep the original; nothing is thrown away
+    return caps
+
+
 def load_device_caps() -> tuple[dict, bool]:
     """
     Return (caps, is_real). Reads device_caps.json if query_device_caps.py has
@@ -414,7 +531,7 @@ def load_device_caps() -> tuple[dict, bool]:
     """
     if os.path.exists(CONN_CACHE):
         with open(CONN_CACHE) as f:
-            return json.load(f), True
+            return _apply_normalized_specs(json.load(f)), True
     n = 108
     return {
         "device_name":     DEVICE_NAME + " (PLACEHOLDER)",
@@ -480,11 +597,27 @@ def check_qubits_on_device(qc_hw: QuantumCircuit, caps: dict) -> list[int]:
     return used
 
 
-def coupling_map_from_caps(caps: dict) -> CouplingMap:
-    """Symmetric CouplingMap over the device's connectivity graph."""
+def coupling_map_from_caps(caps: dict, drop_dead: bool = True) -> CouplingMap:
+    """
+    Symmetric CouplingMap over the device's connectivity graph.
+
+    drop_dead=True removes couplers whose fCZ failed to calibrate. The
+    connectivity graph lists every coupler the chip was BUILT with, not the
+    ones that work today -- on the 2026-08-07 calibration, 31 of 193 CZ edges
+    came back as the failure sentinel. Left in, SABRE will cheerfully route a
+    circuit straight through a broken coupler, and no later check would catch
+    it: the edge is real, the qubits exist, and the QASM is valid. The
+    submission just returns noise.
+
+    Set drop_dead=False to reproduce a routing decision made before the
+    calibration was available.
+    """
+    dead = {tuple(e) for e in (caps.get("dead_edges") or [])} if drop_dead else set()
     edges = set()
     for a, nbrs in caps["connectivity"].items():
         for b in nbrs:
+            if (min(int(a), int(b)), max(int(a), int(b))) in dead:
+                continue
             i, j = int(a), int(b)
             edges.add((i, j))
             edges.add((j, i))

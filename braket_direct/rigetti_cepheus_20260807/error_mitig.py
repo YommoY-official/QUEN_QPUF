@@ -137,7 +137,18 @@ class ErrorMitigation:
         self.t_meas   = readout_time_s
 
         self._coupling  = coupling_map_from_caps(caps)
-        self._neighbors = self._build_neighbors(caps)
+        # TWO adjacency views, deliberately:
+        #   _neighbors      working couplers only -- register growth and
+        #                   routing must agree with the coupling map.
+        #   _neighbors_full every coupler the chip was built with -- chiplet
+        #                   boundaries are a MANUFACTURING fact, and a dead
+        #                   coupler does not move them. Partitioning over the
+        #                   pruned graph instead fragments Cepheus into 21
+        #                   BFS blobs (one of them a single qubit) rather than
+        #                   its 12 real chiplets, which makes both
+        #                   `chiplet_ids` and the intermodule count fiction.
+        self._neighbors      = self._build_neighbors(caps)
+        self._neighbors_full = self._build_neighbors(caps, drop_dead=False)
         self._chiplets  = None
 
     # =====================================================================
@@ -198,18 +209,32 @@ class ErrorMitigation:
     # =====================================================================
 
     @staticmethod
-    def _build_neighbors(caps: dict) -> dict[int, set[int]]:
+    def _build_neighbors(caps: dict, drop_dead: bool = True) -> dict[int, set[int]]:
         """
-        Adjacency over the LIVE qubits. Every live qubit gets an entry, even
-        an isolated one, so callers can do set algebra on the result without
-        an empty-tuple default sneaking in (`.get(q, ()) & unassigned` raises
-        TypeError on a tuple).
+        Adjacency over the LIVE qubits, across WORKING couplers only.
+
+        Every live qubit gets an entry, even an isolated one, so callers can do
+        set algebra on the result without an empty-tuple default sneaking in
+        (`.get(q, ()) & unassigned` raises TypeError on a tuple).
+
+        drop_dead must match what coupling_map_from_caps() does, or placement
+        and routing disagree about the lattice: _candidate_layouts grows
+        registers along this adjacency, so if it can step across a coupler
+        that the coupling map has removed, it proposes layouts whose qubits
+        sit in disconnected components and transpile() rejects the lot with
+        "two qubits need to interact in disconnected components of the
+        coupling map". Placement then falls back to plain routing and the
+        calibration is wasted.
         """
+        dead = {tuple(e) for e in (caps.get("dead_edges") or [])} if drop_dead else set()
         nbrs: dict[int, set[int]] = {q: set() for q in device_qubit_indices(caps)}
         for a, vs in caps["connectivity"].items():
             for b in vs:
-                nbrs.setdefault(int(a), set()).add(int(b))
-                nbrs.setdefault(int(b), set()).add(int(a))
+                i, j = int(a), int(b)
+                if (min(i, j), max(i, j)) in dead:
+                    continue
+                nbrs.setdefault(i, set()).add(j)
+                nbrs.setdefault(j, set()).add(i)
         return nbrs
 
     def chiplets(self) -> dict[int, list[int]]:
@@ -265,16 +290,22 @@ class ErrorMitigation:
         self._chiplets = groups
         return self._chiplets
 
-    def _is_connected(self, qubits: list[int]) -> bool:
+    def _is_connected(self, qubits: list[int], nbrs: dict | None = None) -> bool:
+        """
+        Is the induced subgraph on `qubits` connected? Defaults to the FULL
+        adjacency, because its caller is the chiplet partition, which asks a
+        question about the chip's layout rather than about today's calibration.
+        """
         if not qubits:
             return False
+        nbrs = self._neighbors_full if nbrs is None else nbrs
         want, seen, stack = set(qubits), set(), [qubits[0]]
         while stack:
             q = stack.pop()
             if q in seen:
                 continue
             seen.add(q)
-            stack += [b for b in self._neighbors.get(q, set())
+            stack += [b for b in nbrs.get(q, set())
                       if b in want and b not in seen]
         return seen == want
 
@@ -293,13 +324,31 @@ class ErrorMitigation:
     # Calibration lookups
     # =====================================================================
 
+    # Fidelity assigned to hardware the calibration reported as FAILED. Not
+    # 0.5 (the sentinel value Rigetti sends) and not the default: a broken
+    # coupler is not a mediocre one, and the scorer must rank any placement
+    # touching it below every working alternative.
+    F_DEAD = 1e-6
+
+    def _dead_qubits(self) -> set[int]:
+        return set(self.caps.get("dead_qubits") or [])
+
+    def _dead_edges(self) -> set[tuple[int, int]]:
+        return {tuple(e) for e in (self.caps.get("dead_edges") or [])}
+
     def edge_fidelity(self, a: int, b: int) -> float:
         """
         Two-qubit gate fidelity for edge (a,b) from the live calibration, or
         a default. Intermodule couplers get a deliberately pessimistic
         default so the placement scorer avoids them even with no calibration
         data loaded.
+
+        An edge whose fCZ failed to calibrate scores F_DEAD, not the default
+        -- otherwise a broken coupler would look BETTER than a working
+        intermodule one and the scorer would prefer it.
         """
+        if (min(a, b), max(a, b)) in self._dead_edges():
+            return self.F_DEAD
         specs = self.caps.get("specs", {}).get("2Q", {})
         for key in (f"{a}-{b}", f"{b}-{a}", f"{min(a,b)}-{max(a,b)}"):
             entry = specs.get(key)
@@ -310,6 +359,9 @@ class ErrorMitigation:
         return F2Q_INTERMODULE if self.is_intermodule(a, b) else F2Q
 
     def qubit_fidelity(self, q: int) -> float:
+        """1q gate fidelity from the live calibration, or the F1Q default."""
+        if q in self._dead_qubits():
+            return self.F_DEAD
         specs = self.caps.get("specs", {}).get("1Q", {})
         entry = specs.get(str(q))
         if isinstance(entry, dict) and isinstance(entry.get("f1QRB"), (int, float)):
@@ -317,12 +369,18 @@ class ErrorMitigation:
         return F1Q
 
     def readout_fidelity(self, q: int) -> float:
+        """
+        Readout fidelity from the live calibration, or a default.
+
+        Worth scoring per qubit rather than as a flat constant: the measured
+        fRO on Cepheus spans 0.528 to 0.990 across the chip, so which qubits a
+        register is measured on moves the result far more than the 0.95
+        placeholder suggests.
+        """
         specs = self.caps.get("specs", {}).get("1Q", {})
         entry = specs.get(str(q))
-        if isinstance(entry, dict):
-            for field in ("fRO", "fActiveReset", "f1QRB_std_err"):
-                if field == "fRO" and isinstance(entry.get(field), (int, float)):
-                    return float(entry[field])
+        if isinstance(entry, dict) and isinstance(entry.get("fRO"), (int, float)):
+            return float(entry["fRO"])
         return 0.95
 
     # =====================================================================

@@ -59,7 +59,8 @@ import sys
 from braket.aws import AwsDevice
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rigetti_qpuf_common import DEVICE_ARN, CONN_CACHE, fetch_device_caps
+from rigetti_qpuf_common import (DEVICE_ARN, CONN_CACHE, fetch_device_caps,
+                                 normalize_specs)
 
 RAW_DUMP = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         "device_properties_raw.json")
@@ -177,8 +178,20 @@ def main():
         print()
     else:
         print("=== calibration (from provider.specs) ===")
-        one_q = specs.get("1Q", {})
-        two_q = specs.get("2Q", {})
+        # Cepheus publishes a QCS InstructionSetArchitecture, not the
+        # pyQuil-era {"1Q":..., "2Q":...} dict. Normalise before taking
+        # medians, or every one of them comes out None while the raw
+        # calibration sits in the file unread.
+        flat, dead_q, dead_e = normalize_specs(specs) if (
+            {"instructions", "benchmarks"} & set(specs)) else (specs, [], [])
+        one_q = flat.get("1Q", {})
+        two_q = flat.get("2Q", {})
+        if dead_q or dead_e:
+            print(f"  FAILED calibration: {len(dead_q)} qubit(s), {len(dead_e)} CZ edge(s)")
+            print(f"    dead qubits : {dead_q}")
+            print(f"    dead edges  : {dead_e[:8]}{' ...' if len(dead_e) > 8 else ''}")
+            print("    These are EXCLUDED from the medians below and pruned from the")
+            print("    coupling map, so the router cannot route through them.")
 
         def _median_of(d, keys):
             for key in keys:
