@@ -1,0 +1,182 @@
+{
+  "job_id": "arn:aws:braket:us-west-1:767397707562:quantum-task/72155b3b-0d2a-4512-ac40-bddf786ea283",
+  "datetime": "2026-08-07T12:07:58.459555+00:00",
+  "qpu": "Cepheus-1-108Q",
+  "device_arn": "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
+  "submission": "reservation",
+  "reservation_arn": "arn:aws:braket:us-west-1:767397707562:reservation/339f1ef2-2aec-459e-8e09-8a945b52755a",
+  "circuit_type": "QPE_2targ",
+  "role": "readout_cal",
+  "label": "readout calibration cal0",
+  "cal_state": "cal0",
+  "zne_scale": 1,
+  "zne_scales_all": [
+    1,
+    3,
+    5
+  ],
+  "error_mitigation": "both",
+  "verbatim": true,
+  "n_stages": 1,
+  "state_mode": "known",
+  "phi": 0.125,
+  "ideal_bin": 2.0,
+  "ideal_distribution": {
+    "2": 0.9999999999999982
+  },
+  "n_prec": 4,
+  "n_targ": 2,
+  "n_qubits": 6,
+  "physical_qubits": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "clbit_to_phys": [
+    2,
+    1,
+    3,
+    0
+  ],
+  "n_shots": 5000,
+  "n_1q_gates": 0,
+  "n_2q_gates": 0,
+  "n_gates": 0,
+  "n_measurements": 4,
+  "depth": 1,
+  "depth_2q": 0,
+  "est_fidelity": 1.0,
+  "est_runtime_parallel_s": 16.0102,
+  "est_runtime_serial_s": 16.01,
+  "placement": {
+    "initial_layout": [
+      1,
+      2,
+      0,
+      3,
+      4,
+      5
+    ],
+    "chiplet_ids": [
+      0
+    ],
+    "n_intermodule": 0,
+    "n_swap_pairs": 14,
+    "est_fidelity": 0.1782086973093129,
+    "calibration": "live"
+  },
+  "seed": 10,
+  "target_init_seed": 99,
+  "unitary": {
+    "shape": [
+      4,
+      4
+    ],
+    "real": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.9238795325112867,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.9238795325112867,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.7071067811865475
+      ]
+    ],
+    "imag": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.3826834323650898,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.3826834323650898,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.7071067811865476
+      ]
+    ]
+  },
+  "completed_at": "2026-08-07T12:08:01.813000+00:00",
+  "task_time_seconds": 3.438,
+  "wall_time_seconds": 3.353445,
+  "qpu_time_seconds": null,
+  "n_shots_requested": 5000,
+  "measured_qubits": [
+    2,
+    1,
+    3,
+    0
+  ],
+  "counts": {
+    "0000": 4143,
+    "1000": 280,
+    "0001": 80,
+    "0100": 222,
+    "1100": 53,
+    "1010": 22,
+    "0010": 165,
+    "1001": 11,
+    "0101": 5,
+    "0110": 9,
+    "0011": 4,
+    "1110": 4,
+    "1111": 2
+  },
+  "native_quil_metadata": null,
+  "additional_metadata": {
+    "action": {
+      "braketSchemaHeader": {
+        "name": "braket.ir.openqasm.program",
+        "version": "1"
+      },
+      "source": "OPENQASM 3.0;\nbit[4] c;\n#pragma braket verbatim\nbox {\n}\nc[0] = measure $2;\nc[1] = measure $1;\nc[2] = measure $3;\nc[3] = measure $0;\n",
+      "inputs": null
+    },
+    "aqtMetadata": null,
+    "dwaveMetadata": null,
+    "ionqMetadata": null,
+    "rigettiMetadata": {
+      "braketSchemaHeader": {
+        "name": "braket.task_result.rigetti_metadata",
+        "version": "1"
+      },
+      "nativeQuilMetadata": null,
+      "compiledProgram": "PRAGMA INITIAL_REWIRING \"NAIVE\"\nDECLARE ro BIT[4]\nPRAGMA PRESERVE_BLOCK\nPRAGMA END_PRESERVE_BLOCK\nMEASURE 2 ro[0]\nMEASURE 1 ro[1]\nMEASURE 3 ro[2]\nMEASURE 0 ro[3]"
+    },
+    "oqcMetadata": null,
+    "xanaduMetadata": null,
+    "queraMetadata": null,
+    "simulatorMetadata": null,
+    "iqmMetadata": null
+  }
+}
