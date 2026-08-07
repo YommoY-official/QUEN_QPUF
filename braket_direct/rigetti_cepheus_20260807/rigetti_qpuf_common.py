@@ -335,9 +335,25 @@ def fetch_device_caps(device) -> dict:
     # scores candidate placements with these, so persist the FULL specs, not
     # just medians -- a median tells you nothing about which chiplet is good
     # today.
+    #
+    # `raw` is a plain dict per the RigettiProviderProperties schema, but do
+    # not make that a precondition: a bare `isinstance(raw, dict)` test
+    # DISCARDS the calibration silently if the SDK ever hands back the
+    # pydantic model instead, and the only symptom is specs = {} in
+    # device_caps.json -- which reads exactly like "the device published no
+    # calibration". Unwrap first, then filter.
     specs = {}
     provider = getattr(p, "provider", None)
     raw = getattr(provider, "specs", None) if provider is not None else None
+    if raw is not None and not isinstance(raw, dict):
+        for attr in ("dict", "model_dump"):
+            fn = getattr(raw, attr, None)
+            if callable(fn):
+                try:
+                    raw = fn()
+                    break
+                except Exception:
+                    pass
     if isinstance(raw, dict):
         for group in ("1Q", "2Q"):
             entry = raw.get(group)

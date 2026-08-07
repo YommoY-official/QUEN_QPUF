@@ -21,11 +21,30 @@ other scripts need into device_caps.json:
          requiresContiguousQubitIndices decide how measurements must be
          written.
   - calibration data (per-qubit and per-edge fidelities) if published
-      -> feed the medians back into F1Q / F2Q in rigetti_qpuf_common.py.
+      -> feed the medians back into F1Q / F2Q in rigetti_qpuf_common.py, and
+         give ErrorMitigation.select_best_qubits something better than a flat
+         default to score chiplets with.
 
 Also prints whether `reset` appears anywhere in the device properties, which
 is the check that told us the IonQ two-stage-with-MCM form cannot be reused
 here.
+
+Finding the calibration
+-----------------------
+The cached device_caps.json has real connectivity but specs = {}, so
+placement currently runs on topology alone. This script now tries each ARN in
+CALIBRATION_ARNS and keeps the first that returns a populated provider.specs,
+saying which one won -- rather than querying one endpoint and silently
+recording "no calibration". It also writes the untouched properties blob to
+device_properties_raw.json, so calibration published under an unexpected key
+is still on disk.
+
+    python query_device_caps.py                 # try the built-in candidates
+    python query_device_caps.py --arn <ARN>     # force one (repeatable)
+
+Calibration is often only published while the device is AVAILABLE, so if
+every ARN comes back empty, try again inside the reservation window before
+concluding Rigetti does not publish it.
 """
 
 import argparse
