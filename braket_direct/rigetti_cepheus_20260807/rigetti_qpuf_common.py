@@ -73,7 +73,7 @@ AWS_REGION  = "us-west-1"
 
 # Braket Direct reservation ARN for the booked window. Leave "" to submit
 # on-demand (which costs per-task money outside the window).
-RES_ARN = ""
+RES_ARN = "arn:aws:braket:us-west-1:767397707562:reservation/339f1ef2-2aec-459e-8e09-8a945b52755a"
 
 # -- NATIVE GATE SET -----------------------------------------------------------
 # Rigetti's Braket native set is rx(k*pi/2) / rz(theta) / cz (+ iswap, xy on
