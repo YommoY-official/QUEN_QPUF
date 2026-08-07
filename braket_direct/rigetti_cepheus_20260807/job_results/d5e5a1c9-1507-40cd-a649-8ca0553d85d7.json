@@ -1,0 +1,185 @@
+{
+  "job_id": "arn:aws:braket:us-west-1:767397707562:quantum-task/d5e5a1c9-1507-40cd-a649-8ca0553d85d7",
+  "datetime": "2026-08-07T12:39:48.263346+00:00",
+  "qpu": "Cepheus-1-108Q",
+  "device_arn": "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
+  "submission": "reservation",
+  "reservation_arn": "arn:aws:braket:us-west-1:767397707562:reservation/339f1ef2-2aec-459e-8e09-8a945b52755a",
+  "circuit_type": "QPUF2stage_1targ",
+  "role": "readout_cal",
+  "label": "readout calibration cal0",
+  "cal_state": "cal0",
+  "zne_scale": 1,
+  "zne_scales_all": [
+    1,
+    3,
+    5
+  ],
+  "error_mitigation": "zne+rem",
+  "verbatim": true,
+  "n_stages": 2,
+  "n_prec": 3,
+  "n_targ": 1,
+  "n_qubits": 7,
+  "physical_qubits": [
+    0,
+    1,
+    2,
+    4,
+    5,
+    6
+  ],
+  "clbit_to_phys": [
+    1,
+    0,
+    2,
+    5,
+    4,
+    6
+  ],
+  "n_shots": 50000,
+  "n_1q_gates": 0,
+  "n_2q_gates": 0,
+  "n_gates": 0,
+  "n_measurements": 6,
+  "depth": 1,
+  "depth_2q": 0,
+  "est_fidelity": 1.0,
+  "est_runtime_parallel_s": 25.102,
+  "est_runtime_serial_s": 25.1,
+  "placement": {
+    "initial_layout": [
+      1,
+      2,
+      0,
+      3,
+      4,
+      5,
+      6
+    ],
+    "chiplet_ids": [
+      0
+    ],
+    "n_intermodule": 0,
+    "n_swap_pairs": 12,
+    "est_fidelity": 0.19463538331498598,
+    "calibration": "live"
+  },
+  "seed": 10,
+  "target_init_seed": 99,
+  "unitary": {
+    "shape": [
+      2,
+      2
+    ],
+    "real": [
+      [
+        -0.684118288957023,
+        -0.1679259358530144
+      ],
+      [
+        -0.48475359069288376,
+        0.6723156794200494
+      ]
+    ],
+    "imag": [
+      [
+        -0.154130968095468,
+        -0.6928395856591616
+      ],
+      [
+        0.5227234141482715,
+        0.19941368011620547
+      ]
+    ]
+  },
+  "completed_at": "2026-08-07T12:40:41.532000+00:00",
+  "task_time_seconds": 53.359,
+  "wall_time_seconds": 53.268654,
+  "qpu_time_seconds": null,
+  "n_shots_requested": 50000,
+  "measured_qubits": [
+    1,
+    0,
+    2,
+    5,
+    4,
+    6
+  ],
+  "counts": {
+    "000000": 39421,
+    "000100": 807,
+    "001000": 2669,
+    "000001": 1876,
+    "001010": 232,
+    "100000": 2227,
+    "101000": 514,
+    "000010": 553,
+    "001100": 60,
+    "001001": 152,
+    "011000": 50,
+    "110000": 46,
+    "010000": 713,
+    "010100": 15,
+    "100100": 51,
+    "111000": 28,
+    "000111": 17,
+    "100001": 100,
+    "001110": 21,
+    "000110": 67,
+    "100011": 2,
+    "000101": 95,
+    "101010": 56,
+    "010010": 11,
+    "000011": 38,
+    "101100": 12,
+    "100010": 40,
+    "101001": 26,
+    "101011": 4,
+    "001011": 10,
+    "011010": 4,
+    "001101": 11,
+    "100110": 6,
+    "111010": 2,
+    "010101": 5,
+    "010001": 28,
+    "110010": 1,
+    "101110": 5,
+    "100111": 1,
+    "101111": 1,
+    "110001": 4,
+    "001111": 4,
+    "011001": 3,
+    "100101": 9,
+    "110100": 1,
+    "011100": 1,
+    "101101": 1
+  },
+  "native_quil_metadata": null,
+  "additional_metadata": {
+    "action": {
+      "braketSchemaHeader": {
+        "name": "braket.ir.openqasm.program",
+        "version": "1"
+      },
+      "source": "OPENQASM 3.0;\nbit[6] c;\n#pragma braket verbatim\nbox {\n}\nc[0] = measure $1;\nc[1] = measure $0;\nc[2] = measure $2;\nc[3] = measure $5;\nc[4] = measure $4;\nc[5] = measure $6;\n",
+      "inputs": null
+    },
+    "aqtMetadata": null,
+    "dwaveMetadata": null,
+    "ionqMetadata": null,
+    "rigettiMetadata": {
+      "braketSchemaHeader": {
+        "name": "braket.task_result.rigetti_metadata",
+        "version": "1"
+      },
+      "nativeQuilMetadata": null,
+      "compiledProgram": "PRAGMA INITIAL_REWIRING \"NAIVE\"\nDECLARE ro BIT[6]\nPRAGMA PRESERVE_BLOCK\nPRAGMA END_PRESERVE_BLOCK\nMEASURE 1 ro[0]\nMEASURE 0 ro[1]\nMEASURE 2 ro[2]\nMEASURE 5 ro[3]\nMEASURE 4 ro[4]\nMEASURE 6 ro[5]"
+    },
+    "oqcMetadata": null,
+    "xanaduMetadata": null,
+    "queraMetadata": null,
+    "simulatorMetadata": null,
+    "iqmMetadata": null
+  }
+}

@@ -9827,190 +9827,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.977
-              }
-            ],
-            "node_ids": [
-              95
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.941
-              }
-            ],
-            "node_ids": [
-              102
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.969
-              }
-            ],
-            "node_ids": [
-              103
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.951
-              }
-            ],
-            "node_ids": [
-              88
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.975
-              }
-            ],
-            "node_ids": [
-              86
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.986
-              }
-            ],
-            "node_ids": [
-              94
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.978
-              }
-            ],
-            "node_ids": [
-              93
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
+                "timestamp": "2026-08-07T12:03:51+00:00",
                 "value": 0.964
-              }
-            ],
-            "node_ids": [
-              104
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.945
-              }
-            ],
-            "node_ids": [
-              87
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.975
-              }
-            ],
-            "node_ids": [
-              89
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.932
-              }
-            ],
-            "node_ids": [
-              74
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:33+00:00",
-                "value": 0.901
-              }
-            ],
-            "node_ids": [
-              1
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:33+00:00",
-                "value": 0.949
-              }
-            ],
-            "node_ids": [
-              9
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:33+00:00",
-                "value": 0.929
-              }
-            ],
-            "node_ids": [
-              10
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:32+00:00",
-                "value": 0.952
               }
             ],
             "node_ids": [
@@ -10022,12 +9840,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:34+00:00",
-                "value": 0.947
+                "timestamp": "2026-08-07T12:03:52+00:00",
+                "value": 0.953
               }
             ],
             "node_ids": [
-              11
+              9
             ]
           },
           {
@@ -10035,12 +9853,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:33+00:00",
-                "value": 0.916
+                "timestamp": "2026-08-07T12:03:52+00:00",
+                "value": 0.899
               }
             ],
             "node_ids": [
-              2
+              1
             ]
           },
           {
@@ -10048,8 +9866,21 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:34+00:00",
-                "value": 0.961
+                "timestamp": "2026-08-07T12:03:52+00:00",
+                "value": 0.937
+              }
+            ],
+            "node_ids": [
+              10
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:53+00:00",
+                "value": 0.97
               }
             ],
             "node_ids": [
@@ -10061,8 +9892,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:35+00:00",
-                "value": 0.782
+                "timestamp": "2026-08-07T12:03:53+00:00",
+                "value": 0.8240000000000001
               }
             ],
             "node_ids": [
@@ -10074,21 +9905,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:35+00:00",
-                "value": 0.959
-              }
-            ],
-            "node_ids": [
-              20
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:35+00:00",
-                "value": 0.943
+                "timestamp": "2026-08-07T12:03:54+00:00",
+                "value": 0.947
               }
             ],
             "node_ids": [
@@ -10100,25 +9918,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:36+00:00",
-                "value": 0.923
-              }
-            ],
-            "node_ids": [
-              4
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
+                "timestamp": "2026-08-07T12:03:53+00:00",
                 "value": 0.955
               }
             ],
             "node_ids": [
-              26
+              20
             ]
           },
           {
@@ -10126,8 +9931,21 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:36+00:00",
-                "value": 0.972
+                "timestamp": "2026-08-07T12:03:52+00:00",
+                "value": 0.915
+              }
+            ],
+            "node_ids": [
+              2
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.968
               }
             ],
             "node_ids": [
@@ -10139,12 +9957,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.96
+                "timestamp": "2026-08-07T12:03:54+00:00",
+                "value": 0.935
               }
             ],
             "node_ids": [
-              28
+              4
             ]
           },
           {
@@ -10152,112 +9970,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:36+00:00",
-                "value": 0.892
-              }
-            ],
-            "node_ids": [
-              13
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.96
-              }
-            ],
-            "node_ids": [
-              38
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.953
-              }
-            ],
-            "node_ids": [
-              50
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:36+00:00",
-                "value": 0.92
-              }
-            ],
-            "node_ids": [
-              14
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.966
-              }
-            ],
-            "node_ids": [
-              27
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.821
-              }
-            ],
-            "node_ids": [
-              33
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.941
-              }
-            ],
-            "node_ids": [
-              46
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.887
-              }
-            ],
-            "node_ids": [
-              37
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.954
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.961
               }
             ],
             "node_ids": [
@@ -10269,12 +9983,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.528
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.902
               }
             ],
             "node_ids": [
-              45
+              37
             ]
           },
           {
@@ -10282,12 +9996,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.945
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.956
               }
             ],
             "node_ids": [
-              48
+              28
             ]
           },
           {
@@ -10295,12 +10009,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.951
+                "timestamp": "2026-08-07T12:03:53+00:00",
+                "value": 0.926
               }
             ],
             "node_ids": [
-              42
+              11
             ]
           },
           {
@@ -10308,12 +10022,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:36+00:00",
-                "value": 0.8500000000000001
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.91
               }
             ],
             "node_ids": [
-              12
+              13
             ]
           },
           {
@@ -10321,7 +10035,46 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.937
+              }
+            ],
+            "node_ids": [
+              25
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.956
+              }
+            ],
+            "node_ids": [
+              27
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.836
+              }
+            ],
+            "node_ids": [
+              49
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
                 "value": 0.969
               }
             ],
@@ -10334,25 +10087,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.941
-              }
-            ],
-            "node_ids": [
-              51
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
+                "timestamp": "2026-08-07T12:03:55+00:00",
                 "value": 0.955
               }
             ],
             "node_ids": [
-              105
+              50
             ]
           },
           {
@@ -10360,73 +10100,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.979
-              }
-            ],
-            "node_ids": [
-              96
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.97
-              }
-            ],
-            "node_ids": [
-              107
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.819
-              }
-            ],
-            "node_ids": [
-              49
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.968
-              }
-            ],
-            "node_ids": [
-              98
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.978
-              }
-            ],
-            "node_ids": [
-              44
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.944
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.951
               }
             ],
             "node_ids": [
@@ -10438,86 +10113,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
+                "timestamp": "2026-08-07T12:03:55+00:00",
                 "value": 0.977
-              }
-            ],
-            "node_ids": [
-              15
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:36+00:00",
-                "value": 0.947
-              }
-            ],
-            "node_ids": [
-              21
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.922
-              }
-            ],
-            "node_ids": [
-              97
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.906
-              }
-            ],
-            "node_ids": [
-              106
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:36+00:00",
-                "value": 0.955
-              }
-            ],
-            "node_ids": [
-              22
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.957
-              }
-            ],
-            "node_ids": [
-              6
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.99
               }
             ],
             "node_ids": [
@@ -10529,12 +10126,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.983
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.873
               }
             ],
             "node_ids": [
-              16
+              12
             ]
           },
           {
@@ -10542,8 +10139,86 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.976
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.961
+              }
+            ],
+            "node_ids": [
+              38
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.923
+              }
+            ],
+            "node_ids": [
+              51
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.966
+              }
+            ],
+            "node_ids": [
+              96
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.53
+              }
+            ],
+            "node_ids": [
+              45
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:58+00:00",
+                "value": 0.948
+              }
+            ],
+            "node_ids": [
+              105
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.957
+              }
+            ],
+            "node_ids": [
+              22
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.963
               }
             ],
             "node_ids": [
@@ -10555,12 +10230,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.948
+                "timestamp": "2026-08-07T12:03:58+00:00",
+                "value": 0.975
               }
             ],
             "node_ids": [
-              25
+              107
             ]
           },
           {
@@ -10568,12 +10243,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.893
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.924
               }
             ],
             "node_ids": [
-              92
+              97
             ]
           },
           {
@@ -10581,64 +10256,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.984
-              }
-            ],
-            "node_ids": [
-              82
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.948
-              }
-            ],
-            "node_ids": [
-              17
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.968
-              }
-            ],
-            "node_ids": [
-              91
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.947
-              }
-            ],
-            "node_ids": [
-              7
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
+                "timestamp": "2026-08-07T12:03:58+00:00",
                 "value": 0.963
               }
             ],
             "node_ids": [
-              83
+              98
             ]
           },
           {
@@ -10646,12 +10269,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.97
+                "timestamp": "2026-08-07T12:03:58+00:00",
+                "value": 0.904
               }
             ],
             "node_ids": [
-              90
+              106
             ]
           },
           {
@@ -10659,47 +10282,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.932
-              }
-            ],
-            "node_ids": [
-              24
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.986
-              }
-            ],
-            "node_ids": [
-              99
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.963
-              }
-            ],
-            "node_ids": [
-              67
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.977
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.98
               }
             ],
             "node_ids": [
@@ -10711,12 +10295,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.956
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.933
               }
             ],
             "node_ids": [
-              68
+              14
             ]
           },
           {
@@ -10724,12 +10308,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.881
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.959
               }
             ],
             "node_ids": [
-              85
+              21
             ]
           },
           {
@@ -10737,8 +10321,203 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.988
+              }
+            ],
+            "node_ids": [
+              44
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.953
+              }
+            ],
+            "node_ids": [
+              26
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
                 "value": 0.976
+              }
+            ],
+            "node_ids": [
+              15
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.973
+              }
+            ],
+            "node_ids": [
+              16
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.944
+              }
+            ],
+            "node_ids": [
+              42
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.94
+              }
+            ],
+            "node_ids": [
+              48
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.958
+              }
+            ],
+            "node_ids": [
+              6
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.983
+              }
+            ],
+            "node_ids": [
+              82
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.943
+              }
+            ],
+            "node_ids": [
+              24
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.977
+              }
+            ],
+            "node_ids": [
+              90
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.949
+              }
+            ],
+            "node_ids": [
+              83
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.972
+              }
+            ],
+            "node_ids": [
+              91
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.962
+              }
+            ],
+            "node_ids": [
+              7
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.915
+              }
+            ],
+            "node_ids": [
+              92
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.831
+              }
+            ],
+            "node_ids": [
+              33
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.978
               }
             ],
             "node_ids": [
@@ -10750,8 +10529,47 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.964
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.953
+              }
+            ],
+            "node_ids": [
+              17
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.978
+              }
+            ],
+            "node_ids": [
+              99
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.96
+              }
+            ],
+            "node_ids": [
+              67
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.959
               }
             ],
             "node_ids": [
@@ -10763,8 +10581,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.974
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.982
               }
             ],
             "node_ids": [
@@ -10776,33 +10594,7 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.647
-              }
-            ],
-            "node_ids": [
-              76
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.964
-              }
-            ],
-            "node_ids": [
-              60
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
+                "timestamp": "2026-08-07T12:03:57+00:00",
                 "value": 0.976
               }
             ],
@@ -10815,34 +10607,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.915
-              }
-            ],
-            "node_ids": [
-              61
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.988
-              }
-            ],
-            "node_ids": [
-              77
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.972
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.976
               }
             ],
             "node_ids": [
@@ -10854,12 +10620,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.898
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.982
               }
             ],
             "node_ids": [
-              58
+              77
             ]
           },
           {
@@ -10867,12 +10633,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.963
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.8939999999999999
               }
             ],
             "node_ids": [
-              32
+              85
             ]
           },
           {
@@ -10880,12 +10646,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.967
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.936
               }
             ],
             "node_ids": [
-              47
+              68
             ]
           },
           {
@@ -10893,8 +10659,21 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.967
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.955
+              }
+            ],
+            "node_ids": [
+              60
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.972
               }
             ],
             "node_ids": [
@@ -10906,12 +10685,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.951
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.608
               }
             ],
             "node_ids": [
-              39
+              76
             ]
           },
           {
@@ -10919,47 +10698,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.921
-              }
-            ],
-            "node_ids": [
-              31
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.88
-              }
-            ],
-            "node_ids": [
-              41
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.951
-              }
-            ],
-            "node_ids": [
-              30
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.964
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.966
               }
             ],
             "node_ids": [
@@ -10971,12 +10711,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.971
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.938
               }
             ],
             "node_ids": [
-              52
+              46
             ]
           },
           {
@@ -10984,12 +10724,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.897
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.97
               }
             ],
             "node_ids": [
-              62
+              32
             ]
           },
           {
@@ -10997,12 +10737,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.925
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.909
               }
             ],
             "node_ids": [
-              79
+              58
             ]
           },
           {
@@ -11010,12 +10750,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.744
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.95
               }
             ],
             "node_ids": [
-              69
+              30
             ]
           },
           {
@@ -11023,12 +10763,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.966
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.96
               }
             ],
             "node_ids": [
-              81
+              47
             ]
           },
           {
@@ -11036,12 +10776,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.74
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.885
               }
             ],
             "node_ids": [
-              70
+              41
             ]
           },
           {
@@ -11049,12 +10789,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.955
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.914
               }
             ],
             "node_ids": [
-              55
+              31
             ]
           },
           {
@@ -11062,86 +10802,8 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.953
-              }
-            ],
-            "node_ids": [
-              80
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.974
-              }
-            ],
-            "node_ids": [
-              56
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.983
-              }
-            ],
-            "node_ids": [
-              53
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.978
-              }
-            ],
-            "node_ids": [
-              54
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.976
-              }
-            ],
-            "node_ids": [
-              63
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.931
-              }
-            ],
-            "node_ids": [
-              71
-            ]
-          },
-          {
-            "characteristics": [
-              {
-                "name": "fRO",
-                "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.934
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.929
               }
             ],
             "node_ids": [
@@ -11153,8 +10815,112 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:38+00:00",
-                "value": 0.923
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.974
+              }
+            ],
+            "node_ids": [
+              52
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.936
+              }
+            ],
+            "node_ids": [
+              61
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:55+00:00",
+                "value": 0.945
+              }
+            ],
+            "node_ids": [
+              39
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.884
+              }
+            ],
+            "node_ids": [
+              62
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.73
+              }
+            ],
+            "node_ids": [
+              70
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.913
+              }
+            ],
+            "node_ids": [
+              71
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.98
+              }
+            ],
+            "node_ids": [
+              54
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.982
+              }
+            ],
+            "node_ids": [
+              53
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.906
               }
             ],
             "node_ids": [
@@ -11166,12 +10932,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.946
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.7589999999999999
               }
             ],
             "node_ids": [
-              73
+              69
             ]
           },
           {
@@ -11179,12 +10945,12 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.942
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.933
               }
             ],
             "node_ids": [
-              72
+              79
             ]
           },
           {
@@ -11192,8 +10958,34 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.957
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.963
+              }
+            ],
+            "node_ids": [
+              80
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.978
+              }
+            ],
+            "node_ids": [
+              65
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.974
               }
             ],
             "node_ids": [
@@ -11205,12 +10997,220 @@
               {
                 "name": "fRO",
                 "parameter_values": [],
-                "timestamp": "2026-08-07T11:02:37+00:00",
-                "value": 0.977
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.968
               }
             ],
             "node_ids": [
-              65
+              81
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.972
+              }
+            ],
+            "node_ids": [
+              63
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.981
+              }
+            ],
+            "node_ids": [
+              56
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.957
+              }
+            ],
+            "node_ids": [
+              55
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.952
+              }
+            ],
+            "node_ids": [
+              72
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.965
+              }
+            ],
+            "node_ids": [
+              86
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.982
+              }
+            ],
+            "node_ids": [
+              74
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:56+00:00",
+                "value": 0.952
+              }
+            ],
+            "node_ids": [
+              73
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.946
+              }
+            ],
+            "node_ids": [
+              102
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.966
+              }
+            ],
+            "node_ids": [
+              94
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.969
+              }
+            ],
+            "node_ids": [
+              95
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.978
+              }
+            ],
+            "node_ids": [
+              93
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.961
+              }
+            ],
+            "node_ids": [
+              103
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.95
+              }
+            ],
+            "node_ids": [
+              104
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.97
+              }
+            ],
+            "node_ids": [
+              89
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.948
+              }
+            ],
+            "node_ids": [
+              88
+            ]
+          },
+          {
+            "characteristics": [
+              {
+                "name": "fRO",
+                "parameter_values": [],
+                "timestamp": "2026-08-07T12:03:57+00:00",
+                "value": 0.949
+              }
+            ],
+            "node_ids": [
+              87
             ]
           }
         ]
@@ -14144,9 +14144,9 @@
   ],
   "calibration_source_arn": "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
   "calibration_medians": {
-    "F1Q": null,
-    "F2Q": null,
-    "T1_s": null,
-    "T2_s": null
+    "F1Q": 0.9985233613820987,
+    "F2Q": 0.988842339222544,
+    "T1_s": 2.6487174721312456e-05,
+    "T2_s": 1.082177292133224e-05
   }
 }
