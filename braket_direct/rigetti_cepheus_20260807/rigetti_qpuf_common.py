@@ -410,6 +410,59 @@ def load_device_caps() -> tuple[dict, bool]:
     }, False
 
 
+def device_qubit_indices(caps: dict) -> set[int]:
+    """
+    The physical indices that actually EXIST on the device.
+
+    This is NOT range(qubit_count). Cepheus-1-108Q reports qubitCount=107 but
+    its live indices run 0..107 with 8 missing -- the chip is a 108-site
+    lattice with one retired qubit, and Rigetti keeps the original numbering
+    rather than renumbering the survivors. So the count and the index space
+    disagree by exactly the number of holes, and anything that asks "does this
+    qubit exist" must consult the index set, never the count.
+    """
+    idx: set[int] = set()
+    for a, nbrs in caps["connectivity"].items():
+        idx.add(int(a))
+        idx.update(int(b) for b in nbrs)
+    return idx
+
+
+def check_qubits_on_device(qc_hw: QuantumCircuit, caps: dict) -> list[int]:
+    """
+    Verify every physical qubit the routed circuit TOUCHES exists on the
+    device. Returns the sorted list of touched indices.
+
+    Why not the obvious `qc_hw.num_qubits <= qubit_count`: qiskit sizes a
+    routed circuit by the WIDEST index in the coupling map, and it pads the
+    holes with isolated placeholder qubits. On Cepheus the top index is 107,
+    so every routed circuit comes back 108 wide -- even a 5-qubit one --
+    while Braket reports 107 qubits. Comparing width to count therefore fires
+    on every single submission and means nothing: the width is an index-space
+    upper bound, not a demand for 108 qubits. The 103 untouched wires carry no
+    gates, are dropped by to_braket_qasm (which emits `$n` only for qubits
+    that appear in an instruction), and never reach the device.
+
+    The real failure this guards against is a circuit addressing a qubit that
+    is not on the chip. The placeholder for a hole is isolated in the coupling
+    map, so the router cannot route THROUGH it -- but a circuit built directly
+    on physical indices (the readout-calibration circuits) has no such
+    protection, which is why the check is on the touched set.
+    """
+    live = device_qubit_indices(caps)
+    used = sorted({qc_hw.find_bit(q).index
+                   for inst in qc_hw.data for q in inst.qubits})
+    dead = [q for q in used if q not in live]
+    if dead:
+        raise ValueError(
+            f"circuit addresses qubit(s) {dead}, which do not exist on "
+            f"{caps['device_name']} (live indices: {min(live)}..{max(live)}, "
+            f"{len(live)} qubits, missing "
+            f"{sorted(set(range(min(live), max(live) + 1)) - live)})"
+        )
+    return used
+
+
 def coupling_map_from_caps(caps: dict) -> CouplingMap:
     """Symmetric CouplingMap over the device's connectivity graph."""
     edges = set()

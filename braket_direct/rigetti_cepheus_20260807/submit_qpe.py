@@ -130,10 +130,23 @@ def _one_of(options: tuple[str, ...]):
 
 
 def _prompt(label, default, cast):
-    """Prompt for a value; blank input or EOF keeps the [default]."""
+    """
+    Prompt for a value; blank input or EOF keeps the [default].
+
+    `default` must ALREADY be the target type -- it is returned as-is and is
+    never passed through `cast`. Handing this the display spelling instead
+    (the string "1/8" for a float, "1 3 5" for a list) silently leaks a str
+    into a typed variable on the Enter path only, and the failure surfaces far
+    away at the first format of that variable, as
+    "unknown format code 'g' for object type 'str'".
+
+    Formatting the default for display is this function's job, not the
+    caller's -- that is what removes the temptation to pass a string.
+    """
+    shown = " ".join(map(str, default)) if isinstance(default, (list, tuple)) else default
     while True:
         try:
-            raw = input(f"{label} [{default}]: ").strip()
+            raw = input(f"{label} [{shown}]: ").strip()
         except EOFError:
             return default
         if raw == "":
@@ -141,7 +154,7 @@ def _prompt(label, default, cast):
         try:
             return cast(raw)
         except Exception as e:
-            print(f"  invalid input ({e}); try again or press Enter for {default}.")
+            print(f"  invalid input ({e}); try again or press Enter for {shown}.")
 
 
 def prompt_config():
@@ -165,7 +178,7 @@ def prompt_config():
 
     if MITIGATION in ("zne", "both"):
         ZNE_SCALES = _prompt("  ZNE noise scales (odd ints)",
-                             " ".join(map(str, ZNE_SCALES)), _parse_scales)
+                             ZNE_SCALES, _parse_scales)
     else:
         ZNE_SCALES = [1]
 
@@ -174,7 +187,7 @@ def prompt_config():
     print("  haar   seeded Haar U + Haar target state (comparable to the QPUF run)")
     STATE_MODE = _prompt("State mode", STATE_MODE, _one_of(("known", "haar")))
     if STATE_MODE == "known":
-        PHI = _prompt("  Phase PHI to estimate (e.g. 1/8)", "1/8", _fraction)
+        PHI = _prompt("  Phase PHI to estimate (e.g. 1/8)", PHI, _fraction)
 
     USE_VERBATIM = _prompt("\nVerbatim box? (required for ZNE to survive Quilc) (y/n)",
                            USE_VERBATIM, _parse_bool)
