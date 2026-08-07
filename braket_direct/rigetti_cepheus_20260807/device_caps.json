@@ -659,6 +659,28 @@
     "supportsPartialVerbatimBox": true,
     "supportsUnassignedMeasurements": false
   },
+  "specs": {},
+  "execution_windows": [
+    {
+      "executionDay": "ExecutionDay.EVERYDAY",
+      "windowStartHour": "00:00:00",
+      "windowEndHour": "06:59:59"
+    },
+    {
+      "executionDay": "ExecutionDay.EVERYDAY",
+      "windowStartHour": "09:00:00",
+      "windowEndHour": "19:00:00"
+    },
+    {
+      "executionDay": "ExecutionDay.EVERYDAY",
+      "windowStartHour": "21:00:00",
+      "windowEndHour": "23:59:59"
+    }
+  ],
+  "shots_range": [
+    10,
+    50000
+  ],
   "calibration_medians": {
     "F1Q": null,
     "F2Q": null,
