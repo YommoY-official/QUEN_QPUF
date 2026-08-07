@@ -51,8 +51,10 @@ from rigetti_qpuf_common import (
     F1Q, F2Q,
     haar_random_unitary, build_qpuf_two_stage,
     load_device_caps, transpile_for_rigetti, count_native,
+    check_qubits_on_device, native_gate_violations,
     measured_physical_qubits, fold_global, readout_calibration_circuits,
     to_braket_qasm, append_job_log, encode_unitary,
+    task_tags, report_reservation,
     estimate_runtime_s, estimate_fidelity, fmt_time, print_circuit_report,
 )
 
@@ -98,10 +100,22 @@ def _parse_scales(s: str) -> list[int]:
 
 
 def _prompt(label, default, cast):
-    """Prompt for a value; blank input or EOF keeps the [default]."""
+    """
+    Prompt for a value; blank input or EOF keeps the [default].
+
+    `default` must ALREADY be the target type -- it is returned as-is and is
+    never passed through `cast`. Handing this the display spelling instead
+    ("1 3 5" for a list of ints) silently leaks a str into a typed variable on
+    the Enter path only, and the failure surfaces far away: iterating the
+    "list" then yields characters, and len() counts characters, not scales.
+
+    Formatting the default for display is this function's job, not the
+    caller's -- that is what removes the temptation to pass a string.
+    """
+    shown = " ".join(map(str, default)) if isinstance(default, (list, tuple)) else default
     while True:
         try:
-            raw = input(f"{label} [{default}]: ").strip()
+            raw = input(f"{label} [{shown}]: ").strip()
         except EOFError:
             return default
         if raw == "":
@@ -109,7 +123,7 @@ def _prompt(label, default, cast):
         try:
             return cast(raw)
         except Exception as e:
-            print(f"  invalid input ({e}); try again or press Enter for {default}.")
+            print(f"  invalid input ({e}); try again or press Enter for {shown}.")
 
 
 def prompt_config():
@@ -122,7 +136,7 @@ def prompt_config():
     N_TARG  = _prompt("Target qubits               N_TARG", N_TARG, _pos_int)
     N_SHOTS = _prompt("Shots per circuit           N_SHOTS", N_SHOTS, _pos_int)
     ZNE_SCALES = _prompt("ZNE noise scales (odd ints; '1' = no ZNE)",
-                         " ".join(map(str, ZNE_SCALES)), _parse_scales)
+                         ZNE_SCALES, _parse_scales)
     USE_REM = _prompt("Readout-error mitigation calibration? (y/n)", USE_REM, _parse_bool)
     USE_VERBATIM = _prompt("Verbatim box? (required for ZNE to survive Quilc) (y/n)",
                            USE_VERBATIM, _parse_bool)
@@ -301,10 +315,33 @@ def main():
 
     device = AwsDevice(DEVICE_ARN)
     print(f"\nDevice resolved : {device.name}  (status {device.status})")
-    n_dev = device.properties.paradigm.qubitCount
-    if qc_hw.num_qubits > n_dev:
-        print(f"ERROR: circuit declares {qc_hw.num_qubits} qubits, device has {n_dev}.")
+    # Check the qubits the circuit TOUCHES, not its width -- see
+    # check_qubits_on_device(). qc_hw.num_qubits is 108 for every routed
+    # circuit (top physical index 107 + 1), which says nothing about whether
+    # 107 real qubits are enough.
+    try:
+        used = check_qubits_on_device(qc_hw, caps)
+    except ValueError as e:
+        print(f"ERROR: {e}")
         sys.exit(1)
+    print(f"Physical qubits : {used}  ({len(used)} of "
+          f"{device.properties.paradigm.qubitCount} live)")
+
+    # Verbatim pre-flight. A verbatim box is executed EXACTLY as written, so a
+    # single non-native gate anywhere gets the whole program rejected. Catch it
+    # here rather than burning a round trip inside the reservation window.
+    if USE_VERBATIM:
+        bad = sorted({v for job in jobs
+                      for v in native_gate_violations(job["circuit"], caps)})
+        if bad:
+            print("\nERROR: verbatim submission requested, but these are not "
+                  "natively executable:")
+            for v in bad:
+                print(f"    {v}")
+            print("  (transpile_for_rigetti(native_rx=True) should have lowered "
+                  "these -- do not submit verbatim until this is empty.)")
+            sys.exit(1)
+        print(f"Verbatim check  : OK -- all {len(jobs)} circuit(s) native")
 
     # DirectReservation routes every task submitted inside the `with` block to
     # the reserved window instead of billing on-demand QPU time.
@@ -319,9 +356,16 @@ def main():
             qasm_src = to_braket_qasm(job["circuit"], verbatim=USE_VERBATIM,
                                       physical=True)
             print(f"\nSubmitting: {job['label']} ({N_SHOTS} shots) ...")
-            task = device.run(OpenQasmProgram(source=qasm_src), shots=N_SHOTS)
+            task = device.run(
+                OpenQasmProgram(source=qasm_src), shots=N_SHOTS,
+                tags=task_tags("qpuf", {"Role": job["role"],
+                                        "ZneScale": job["zne_scale"],
+                                        "Verbatim": USE_VERBATIM}),
+            )
             submitted_at = datetime.now(timezone.utc).isoformat()
             print(f"  Task ARN : {task.id}")
+            if RES_ARN and not submitted:      # first task tells us if it stuck
+                report_reservation(task, RES_ARN)
 
             prof = job["profile"]
             record = {

@@ -476,9 +476,109 @@ def coupling_map_from_caps(caps: dict) -> CouplingMap:
 
 # -- Transpilation + counting --------------------------------------------------
 
+# Rigetti executes RX only at these angles. RZ is continuous (it is a frame
+# change, not a pulse), which is exactly why an arbitrary RX can be traded for
+# three RZs and two fixed RX(+-pi/2) pulses -- see to_native_rx().
+NATIVE_RX_ANGLES = (-np.pi, -np.pi / 2, 0.0, np.pi / 2, np.pi)
+
+
+def _wrap_angle(theta: float) -> float:
+    """
+    Fold an angle into (-pi, pi]. RX(theta + 2pi) = -RX(theta), so wrapping
+    only ever costs a global phase -- safe here because transpilation to
+    rz/rx/cz leaves no CONTROLLED rx for that phase to become relative to.
+    """
+    t = float(np.mod(theta + np.pi, 2.0 * np.pi) - np.pi)
+    return np.pi if np.isclose(t, -np.pi) else t
+
+
+def to_native_rx(qc_hw: QuantumCircuit, atol: float = 1e-9) -> QuantumCircuit:
+    """
+    Rewrite every arbitrary-angle RX into Rigetti's native pulse set, using
+
+        RX(theta) = RZ(pi/2) RX(pi/2) RZ(theta) RX(-pi/2) RZ(-pi/2)
+
+    (equal up to global phase; verified numerically to ~1e-16). Angles that
+    are already native are kept, and RX(0) is dropped outright.
+
+    WHY THIS IS MANDATORY FOR VERBATIM MODE
+    ---------------------------------------
+    qiskit's `basis_gates=["rz","rx","cz"]` constrains gate NAMES but not
+    rotation ANGLES, so a routed circuit is full of things like rx(0.8293).
+    That is fine on the normal path -- Quilc recompiles it into native pulses
+    server-side. But a `#pragma braket verbatim` box means "run exactly this,
+    no recompilation", so those gates have nothing to lower them and the
+    program is rejected. Since ZNE folding is worthless WITHOUT verbatim (the
+    optimiser would cancel the C^dag C pairs), the two requirements collide
+    unless the circuit is natively executable before it is ever submitted.
+
+    Apply AFTER transpile_for_rigetti and BEFORE fold_global. Folding stays
+    native on its own: inverse() maps rx(pi/2) -> rx(-pi/2) and rz(a) ->
+    rz(-a), and cz is self-inverse.
+
+    Costs 4 extra 1q gates per rewritten RX. RZ is virtual on superconducting
+    hardware (a phase bookkeeping change, zero duration), so the real added
+    cost is one extra physical RX pulse per rewrite, not four gates' worth.
+    """
+    out = QuantumCircuit(QuantumRegister(qc_hw.num_qubits, "q"),
+                         ClassicalRegister(qc_hw.num_clbits, "c"))
+    out.global_phase = qc_hw.global_phase
+
+    for inst in qc_hw.data:
+        op    = inst.operation
+        qargs = [out.qubits[qc_hw.find_bit(q).index] for q in inst.qubits]
+        cargs = [out.clbits[qc_hw.find_bit(c).index] for c in inst.clbits]
+
+        if op.name != "rx":
+            out.append(op, qargs, cargs)
+            continue
+
+        theta = _wrap_angle(float(op.params[0]))
+        q     = qargs[0]
+
+        if any(abs(theta - a) < atol for a in NATIVE_RX_ANGLES):
+            if abs(theta) > atol:           # rx(0) / rx(2pi) is the identity
+                out.rx(theta, q)
+            continue
+
+        out.rz(np.pi / 2, q)
+        out.rx(np.pi / 2, q)
+        out.rz(theta, q)
+        out.rx(-np.pi / 2, q)
+        out.rz(-np.pi / 2, q)
+
+    return out
+
+
+def native_gate_violations(qc_hw: QuantumCircuit, caps: dict,
+                           atol: float = 1e-9) -> list[str]:
+    """
+    Everything in `qc_hw` that Rigetti could not execute verbatim, as
+    human-readable strings. Empty list == safe to wrap in a verbatim box.
+
+    Pre-flight for the submit scripts: a verbatim rejection costs you a task
+    round trip, and during a reservation window that is time you cannot buy
+    back. Cheaper to fail locally.
+    """
+    native = set(caps.get("native_gate_set") or RIGETTI_BASIS)
+    native |= {"measure", "barrier"}
+
+    bad: list[str] = []
+    for inst in qc_hw.data:
+        name = inst.operation.name
+        if name not in native:
+            bad.append(f"non-native gate '{name}'")
+        elif name == "rx":
+            theta = _wrap_angle(float(inst.operation.params[0]))
+            if not any(abs(theta - a) < atol for a in NATIVE_RX_ANGLES):
+                bad.append(f"rx({theta:.6f}) is not a multiple of pi/2")
+    return sorted(set(bad))
+
+
 def transpile_for_rigetti(qc: QuantumCircuit, caps: dict,
                           optimization_level: int = 2,
-                          seed_transpiler: int = 42) -> QuantumCircuit:
+                          seed_transpiler: int = 42,
+                          native_rx: bool = True) -> QuantumCircuit:
     """
     Decompose to rz/rx/cz AND route onto the real lattice. Routing is the
     whole point: without a coupling map the 2q count is a fantasy, because
@@ -486,14 +586,20 @@ def transpile_for_rigetti(qc: QuantumCircuit, caps: dict,
 
     The result has num_qubits == device qubit count, with qubit index i
     meaning PHYSICAL qubit i -- which is what verbatim submission needs.
+
+    native_rx=True additionally lowers arbitrary-angle RX to Rigetti's fixed
+    RX(+-pi/2) pulse set (see to_native_rx). Left on by default because the
+    gate counts this function reports are only honest if they describe a
+    circuit the device can actually execute.
     """
-    return transpile(
+    qc_hw = transpile(
         qc,
         basis_gates=RIGETTI_BASIS + ["measure"],
         coupling_map=coupling_map_from_caps(caps),
         optimization_level=optimization_level,
         seed_transpiler=seed_transpiler,
     )
+    return to_native_rx(qc_hw) if native_rx else qc_hw
 
 
 def count_native(qc_hw: QuantumCircuit) -> dict:
@@ -722,6 +828,59 @@ def to_braket_qasm(qc_hw: QuantumCircuit, verbatim: bool = False,
         out += gates
     out += measures
     return "\n".join(out) + "\n"
+
+
+# -- Reservation bookkeeping ---------------------------------------------------
+
+# Tag applied to every task submitted for this reservation. Braket has NO
+# built-in way to list or cancel "everything belonging to reservation X", so a
+# tag is the only handle that survives the window -- boto3's
+# resourcegroupstaggingapi can then find every task in one call, which is what
+# you want if you have to cancel a misbehaving workload under time pressure.
+RUN_TAG = "cepheus-20260807"
+
+
+def task_tags(workload: str, extra: dict[str, str] | None = None) -> dict[str, str]:
+    """Resource tags for one task. Values must be plain AWS tag strings."""
+    tags = {"ReservationRun": RUN_TAG, "Workload": workload}
+    if RES_ARN:
+        tags["ReservationId"] = RES_ARN.rsplit("/", 1)[-1]
+    if extra:
+        tags.update({k: str(v) for k, v in extra.items()})
+    return tags
+
+
+def reservation_association(task) -> str | None:
+    """
+    The reservation ARN Braket actually attached to `task`, or None.
+
+    Worth checking explicitly, because DirectReservation fails SILENTLY. It
+    works by exporting two environment variables, and AwsSession only attaches
+    the association when the context's device ARN string equals the task's
+    device ARN exactly (aws_session.py, create_quantum_task). On any mismatch
+    there is no warning and no error -- the task simply runs ON-DEMAND at full
+    price. The only way to know is to read the association back.
+    """
+    try:
+        meta = task.metadata()
+    except Exception:
+        return None
+    for assoc in meta.get("associations") or []:
+        if assoc.get("type") == "RESERVATION_TIME_WINDOW_ARN":
+            return assoc.get("arn")
+    return None
+
+
+def report_reservation(task, expected_arn: str) -> None:
+    """Print whether `task` really landed on the reservation. Never raises."""
+    got = reservation_association(task)
+    if got == expected_arn:
+        print("  Reservation : CONFIRMED attached")
+    elif got:
+        print(f"  Reservation : *** MISMATCH -- attached {got}")
+    else:
+        print("  Reservation : could not read back association from task "
+              "metadata -- verify on the Braket console before continuing")
 
 
 # -- Job logging ---------------------------------------------------------------

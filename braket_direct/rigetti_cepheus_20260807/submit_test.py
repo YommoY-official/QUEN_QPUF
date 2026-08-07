@@ -47,7 +47,9 @@ from rigetti_qpuf_common import (
     DEVICE_NAME, DEVICE_ARN, RES_ARN, RIGETTI_BASIS,
     haar_random_unitary, build_qpuf_two_stage,
     load_device_caps, transpile_for_rigetti, count_native,
+    check_qubits_on_device, native_gate_violations,
     to_braket_qasm, append_job_log, encode_unitary,
+    task_tags, report_reservation,
     print_circuit_report,
 )
 
@@ -186,21 +188,45 @@ def main():
     else:
         device, dev_arn, dev_name = AwsDevice(DEVICE_ARN), DEVICE_ARN, DEVICE_NAME
         print(f"\nDevice resolved : {device.name}  (status {device.status})")
-        n_dev = device.properties.paradigm.qubitCount
-        if qc_hw.num_qubits > n_dev:
-            print(f"ERROR: circuit declares {qc_hw.num_qubits} qubits, device has {n_dev}.")
+        # Check the qubits the circuit TOUCHES, not its width -- see
+        # check_qubits_on_device(). qc_hw.num_qubits is 108 for every routed
+        # circuit (top physical index 107 + 1), which says nothing about
+        # whether 107 real qubits are enough.
+        try:
+            used = check_qubits_on_device(qc_hw, caps)
+        except ValueError as e:
+            print(f"ERROR: {e}")
             sys.exit(1)
+        print(f"Physical qubits : {used}  ({len(used)} of "
+              f"{device.properties.paradigm.qubitCount} live)")
+
+        # Verbatim pre-flight -- a verbatim box runs EXACTLY as written, so one
+        # non-native gate rejects the whole program. Proving this passes is a
+        # main point of the test job: ZNE is worthless without verbatim.
+        if verbatim:
+            bad = native_gate_violations(qc_hw, caps)
+            if bad:
+                print("\nERROR: verbatim requested, but these are not natively "
+                      "executable:")
+                for v in bad:
+                    print(f"    {v}")
+                sys.exit(1)
+            print("Verbatim check  : OK -- circuit is native")
+
+    tags = task_tags("test", {"Target": target, "Verbatim": verbatim})
 
     print(f"\nSubmitting {N_SHOTS} shots to {dev_name} ...")
     if target == "res":
         from braket.aws import DirectReservation
         with DirectReservation(device, reservation_arn=RES_ARN):
-            task = device.run(program, shots=N_SHOTS)
+            task = device.run(program, shots=N_SHOTS, tags=tags)
     else:
-        task = device.run(program, shots=N_SHOTS)
+        task = device.run(program, shots=N_SHOTS, tags=tags)
 
     submitted_at = datetime.now(timezone.utc).isoformat()
     print(f"Job submitted.\n  Task ARN  : {task.id}\n  Timestamp : {submitted_at}")
+    if target == "res":
+        report_reservation(task, RES_ARN)
 
     record = {
         "job_id":            task.id,

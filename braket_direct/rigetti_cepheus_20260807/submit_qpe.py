@@ -61,8 +61,10 @@ from rigetti_qpuf_common import (
     haar_random_unitary, known_phase_unitary,
     build_qpe_circuit, ideal_qpe_distribution,
     load_device_caps, transpile_for_rigetti, count_native,
+    check_qubits_on_device, native_gate_violations,
     measured_physical_qubits, fold_global, readout_calibration_circuits,
     to_braket_qasm, append_job_log, encode_unitary,
+    task_tags, report_reservation,
     estimate_fidelity, fmt_time, print_circuit_report,
 )
 
@@ -343,10 +345,33 @@ def main():
 
     device = AwsDevice(DEVICE_ARN)
     print(f"\nDevice resolved : {device.name}  (status {device.status})")
-    n_dev = device.properties.paradigm.qubitCount
-    if qc_hw.num_qubits > n_dev:
-        print(f"ERROR: circuit declares {qc_hw.num_qubits} qubits, device has {n_dev}.")
+    # Check the qubits the circuit TOUCHES, not its width -- see
+    # check_qubits_on_device(). qc_hw.num_qubits is 108 for every routed
+    # circuit (top physical index 107 + 1), which says nothing about whether
+    # 107 real qubits are enough.
+    try:
+        used = check_qubits_on_device(qc_hw, caps)
+    except ValueError as e:
+        print(f"ERROR: {e}")
         sys.exit(1)
+    print(f"Physical qubits : {used}  ({len(used)} of "
+          f"{device.properties.paradigm.qubitCount} live)")
+
+    # Verbatim pre-flight. A verbatim box is executed EXACTLY as written, so a
+    # single non-native gate anywhere gets the whole program rejected. Catch it
+    # here rather than burning a round trip inside the reservation window.
+    if USE_VERBATIM:
+        bad = sorted({v for job in jobs
+                      for v in native_gate_violations(job["circuit"], caps)})
+        if bad:
+            print("\nERROR: verbatim submission requested, but these are not "
+                  "natively executable:")
+            for v in bad:
+                print(f"    {v}")
+            print("  (transpile_for_rigetti(native_rx=True) should have lowered "
+                  "these -- do not submit verbatim until this is empty.)")
+            sys.exit(1)
+        print(f"Verbatim check  : OK -- all {len(jobs)} circuit(s) native")
 
     # DirectReservation routes every task submitted inside the block to the
     # reserved window instead of billing on-demand QPU time.
@@ -361,9 +386,16 @@ def main():
             qasm_src = to_braket_qasm(job["circuit"], verbatim=USE_VERBATIM,
                                       physical=True)
             print(f"\nSubmitting: {job['label']} ({N_SHOTS} shots) ...")
-            task = device.run(OpenQasmProgram(source=qasm_src), shots=N_SHOTS)
+            task = device.run(
+                OpenQasmProgram(source=qasm_src), shots=N_SHOTS,
+                tags=task_tags("qpe", {"Role": job["role"],
+                                       "ZneScale": job["zne_scale"],
+                                       "Verbatim": USE_VERBATIM}),
+            )
             submitted_at = datetime.now(timezone.utc).isoformat()
             print(f"  Task ARN : {task.id}")
+            if RES_ARN and not submitted:      # first task tells us if it stuck
+                report_reservation(task, RES_ARN)
 
             prof = job["profile"]
             record = {
