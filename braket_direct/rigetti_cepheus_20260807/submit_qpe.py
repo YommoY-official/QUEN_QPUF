@@ -49,6 +49,7 @@ Results go to job_results_qpe/. Retrieve with:
     python checkRetrieve.py job_results_qpe
 """
 
+import argparse
 import os
 import sys
 from datetime import datetime, timezone
@@ -64,9 +65,10 @@ from rigetti_qpuf_common import (
     check_qubits_on_device, native_gate_violations,
     measured_physical_qubits, fold_global, readout_calibration_circuits,
     to_braket_qasm, append_job_log, encode_unitary,
-    task_tags, report_reservation,
+    task_tags, report_reservation, confirm_submit,
     estimate_fidelity, fmt_time, print_circuit_report,
 )
+from error_mitig import ErrorMitigation
 
 # -- DEFAULTS (all overridable at the prompt) ----------------------------------
 N_PREC      = 5            # precision qubits
@@ -81,6 +83,15 @@ USE_VERBATIM = True
 
 SEED             = 10      # Haar unitary seed   (matches the QPUF scripts)
 TARGET_INIT_SEED = 99      # Haar target-state seed
+
+ASSUME_YES = False         # set by --yes; skips the final confirmation
+
+# Dynamical decoupling. A CLI FLAG, deliberately not a prompt: the prompt
+# sequence is what the scripted heredoc runs in RESERVATION_SCHEDULE.md count
+# their answer lines against, and inserting a question here would silently
+# shift every later answer in those scripts. "none" disables it.
+DDD_SEQ    = "none"        # none | XX | YY | XY4 | XYXYX | II
+DDD_CHOICES = ("none", "XX", "YY", "XY4", "XYXYX", "II")
 
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            "job_results_qpe")
@@ -150,6 +161,10 @@ def _prompt(label, default, cast):
         try:
             raw = input(f"{label} [{shown}]: ").strip()
         except EOFError:
+            # Non-interactive stdin. Say so -- a silent fallback here is how a
+            # run ends up submitting defaults you never chose, or (worse)
+            # printing a config you did choose and then aborting at the end.
+            print(f"\n  [no input available -- using default {shown}]")
             return default
         if raw == "":
             return default
@@ -208,6 +223,28 @@ def prompt_config():
 # -- Main ----------------------------------------------------------------------
 
 def main():
+    global ASSUME_YES, DDD_SEQ
+    ap = argparse.ArgumentParser(
+        description="Submit single-stage QPE to Cepheus-1-108Q.")
+    ap.add_argument("--yes", action="store_true",
+                    help="skip the final confirmation prompt and submit")
+    ap.add_argument("--ddd", choices=DDD_CHOICES, default=DDD_SEQ,
+                    help="dynamical-decoupling sequence to insert into idle "
+                         "windows (default: none). XY4 is the recommended "
+                         "sequence; II is the null control. Costs NO extra "
+                         "tasks. Requires --verbatim-safe submission: the "
+                         "Rigetti compiler cancels DD pulses otherwise.")
+    args = ap.parse_args()
+    ASSUME_YES = args.yes
+    DDD_SEQ    = args.ddd
+
+    # One id per invocation, stamped onto every task it submits. The analysis
+    # needs to tell repeat BATCHES of an identical config apart, and the run
+    # parameters cannot do it -- three batches of the same config are
+    # identical in every logged field except the timestamp. Inferring batches
+    # from timestamp gaps works but is fragile; this makes it explicit.
+    batch_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
     prompt_config()
 
     use_zne = MITIGATION in ("zne", "both")
@@ -247,6 +284,36 @@ def main():
     # reach it, so where the hub sits drives the whole SWAP count.
     qc_hw       = place_and_route(qc, caps, hub_qubits=list(range(N_TARG)),
                                   verbose=True)
+
+    # -- DDD, BEFORE folding ---------------------------------------------------
+    # Order matters and is not arbitrary. Decoupling the base circuit and then
+    # folding it means every lambda scales the noise of ONE well-defined
+    # circuit C_ddd, which is what the ZNE fit assumes. Folding first and
+    # decoupling afterwards would decouple the folded circuit's own idle
+    # structure instead, making the thing being extrapolated a different
+    # circuit at every lambda -- so DDD and ZNE would stop being independent
+    # factors and the 2x2 cell would not mean what it says.
+    #
+    # Folding preserves nativeness here: inverse(rx(+-pi/2)) is rx(-+pi/2) and
+    # inverse(rz(t)) is rz(-t), all still in the native set, and
+    # native_gate_violations() re-checks every job before submission anyway.
+    ddd_report = None
+    if DDD_SEQ != "none":
+        em = ErrorMitigation(caps)
+        before = qc_hw
+        qc_hw = em.apply_ddd(qc_hw, sequence=DDD_SEQ, verbose=True)
+        ddd_report = em.ddd_report(qc_hw)
+        check = em.verify_ddd(before, qc_hw)
+        print(f"  DDD {DDD_SEQ}: {check}")
+        if not check.get("ok", True):
+            print("ERROR: DDD verification failed -- the transform did not add "
+                  "the gates it claims. Not submitting.")
+            sys.exit(1)
+        if not USE_VERBATIM:
+            print("\n!!  WARNING: DDD requested with VERBATIM=off. Rigetti's Quilc")
+            print("    cancels XX -> I and will strip the pulses back out. The run")
+            print("    would be unmitigated, not merely weakly mitigated.\n")
+
     phys_qubits = measured_physical_qubits(qc_hw)
 
     # -- Noiseless reference ---------------------------------------------------
@@ -265,6 +332,11 @@ def main():
     print(f"  mitigation        : {MITIGATION}"
           + (f"   ZNE scales {scales}" if use_zne else "")
           + ("   REM 2 tasks" if use_rem else ""))
+    print(f"  DDD               : {DDD_SEQ}"
+          + (f"   {ddd_report.get('n_pulses', '?')} pulses in "
+             f"{ddd_report.get('n_windows', '?')} idle windows (0 extra tasks)"
+             if ddd_report else "   (no decoupling)"))
+    print(f"  batch id          : {batch_id}")
     print(f"  verbatim          : {USE_VERBATIM}")
     print(f"  state mode        : {STATE_MODE}")
     if STATE_MODE == "known":
@@ -331,12 +403,8 @@ def main():
         print("\n  WARNING: RES_ARN is empty -- these tasks would be submitted")
         print("           ON-DEMAND and billed per task, not against a reservation.")
 
-    try:
-        resp = input(f"\nSubmit {len(jobs)} task(s) to {DEVICE_NAME}? [y/N]: ").strip().lower()
-    except EOFError:
-        resp = ""
-    if resp not in ("y", "yes"):
-        print("Aborted -- nothing submitted.")
+    if not confirm_submit(
+            f"Submit {len(jobs)} task(s) to {DEVICE_NAME}? [y/N]: ", ASSUME_YES):
         return
 
     # -- Submit ----------------------------------------------------------------
@@ -416,6 +484,15 @@ def main():
                 "zne_scale":         job["zne_scale"],
                 "zne_scales_all":    scales,
                 "error_mitigation":  MITIGATION,
+                # DDD is a circuit transform, not a task: it costs nothing
+                # extra to submit, but DDD-on and DDD-off are DIFFERENT
+                # circuits and must never be pooled. The analysis keys on
+                # `ddd_sequence`, so it has to be logged even when off.
+                "ddd_sequence":      DDD_SEQ,
+                "ddd_report":        ddd_report,
+                # Distinguishes repeat batches of an otherwise identical
+                # config -- see the batch_id comment in main().
+                "batch_id":          batch_id,
                 "verbatim":          USE_VERBATIM,
                 "n_stages":          1,
                 "state_mode":        STATE_MODE,

@@ -39,6 +39,7 @@ Everything is logged to job_results/job_log.txt with the `role` and
 with:  python checkRetrieve.py
 """
 
+import argparse
 import os
 import sys
 from datetime import datetime, timezone
@@ -54,7 +55,7 @@ from rigetti_qpuf_common import (
     check_qubits_on_device, native_gate_violations,
     measured_physical_qubits, fold_global, readout_calibration_circuits,
     to_braket_qasm, append_job_log, encode_unitary,
-    task_tags, report_reservation,
+    task_tags, report_reservation, confirm_submit,
     estimate_runtime_s, estimate_fidelity, fmt_time, print_circuit_report,
 )
 
@@ -68,6 +69,8 @@ USE_VERBATIM = True
 
 SEED             = 10
 TARGET_INIT_SEED = 99
+
+ASSUME_YES = False         # set by --yes; skips the final confirmation
 
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "job_results")
 # ------------------------------------------------------------------------------
@@ -117,6 +120,10 @@ def _prompt(label, default, cast):
         try:
             raw = input(f"{label} [{shown}]: ").strip()
         except EOFError:
+            # Non-interactive stdin. Say so -- a silent fallback here is how a
+            # run ends up submitting defaults you never chose, or (worse)
+            # printing a config you did choose and then aborting at the end.
+            print(f"\n  [no input available -- using default {shown}]")
             return default
         if raw == "":
             return default
@@ -202,6 +209,13 @@ def viability_table(n_targ: int, caps: dict, n_shots: int, n_prec_max: int = 6):
 # -- Main ----------------------------------------------------------------------
 
 def main():
+    global ASSUME_YES
+    ap = argparse.ArgumentParser(
+        description="Submit the two-stage PE-QPUF to Cepheus-1-108Q.")
+    ap.add_argument("--yes", action="store_true",
+                    help="skip the final confirmation prompt and submit")
+    ASSUME_YES = ap.parse_args().yes
+
     prompt_config()
 
     caps, caps_are_real = load_device_caps()
@@ -307,12 +321,8 @@ def main():
         print("\n  WARNING: RES_ARN is empty -- these tasks would be submitted")
         print("           ON-DEMAND and billed per task, not against a reservation.")
 
-    try:
-        resp = input(f"\nSubmit {len(jobs)} task(s) to {DEVICE_NAME}? [y/N]: ").strip().lower()
-    except EOFError:
-        resp = ""
-    if resp not in ("y", "yes"):
-        print("Aborted -- nothing submitted.")
+    if not confirm_submit(
+            f"Submit {len(jobs)} task(s) to {DEVICE_NAME}? [y/N]: ", ASSUME_YES):
         return
 
     # -- Submit ----------------------------------------------------------------
