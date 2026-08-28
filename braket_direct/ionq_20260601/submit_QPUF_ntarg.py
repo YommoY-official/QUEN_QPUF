@@ -128,7 +128,10 @@ def build_qpe_stage(n_prec: int, U: np.ndarray) -> QuantumCircuit:
         qc.append(cU, [prec[k]] + targ)
 
     iqft = QFTGate(n_prec).inverse()
-    qc.append(iqft, prec)
+    # QFTGate is little-endian (qubit k weight 2^k) but prec is built MSB-first
+    # (prec[0] weight 2^{n_prec-1}); must reverse index order or phase smears
+    # across output bins instead of landing in one bin (known-bug list item 4).
+    qc.append(iqft, prec[::-1])
 
     return qc
 

@@ -98,7 +98,9 @@ def build_qpe_stage(n_prec, U):
         U_pow = _stable_matrix_power(U, power)
         cU = UnitaryGate(U_pow, label=f"U^{power}").control(1)
         qc.append(cU, [prec[k]] + targ)
-    qc.append(QFTGate(n_prec).inverse(), prec)
+    # QFTGate is little-endian (qubit k weight 2^k) but prec is built MSB-first
+    # (prec[0] weight 2^{n_prec-1}); must reverse index order (known-bug list item 4).
+    qc.append(QFTGate(n_prec).inverse(), prec[::-1])
     return qc
 
 
