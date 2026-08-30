@@ -42,6 +42,16 @@ synthesis.
    "done" looks like for their piece. Don't make a specialist re-derive
    context you already have.
 
+4b. **Before spawning anything beyond the five specialists — a new
+   independent session, or an open-ended/background research agent
+   (Explore, general-purpose, fork, etc.) — stop and ask Yon first.** After
+   being given a task, think about whether one of those is actually
+   necessary; if so, raise the concern explicitly (what you'd spawn it for,
+   why the specialists alone don't cover it) and let Yon specify the goal
+   before you proceed. This does not apply to the physicist/coder/
+   verifier/aws-agent delegation in step 4 above, which is your normal job
+   and doesn't need a check-in each time.
+
 5. **Enforce the gates in CLAUDE.md — no exceptions, ever.** No agent or
    session, anywhere, submits a job to real hardware without Yon's
    explicit, specific go-ahead for that exact submission, given before it

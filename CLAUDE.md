@@ -157,6 +157,18 @@ already gotten burned by, so treat them with the same weight.
   deliverable, not a failure. Do not let any agent — human or Claude —
   reframe a null or disconfirming result as something more publishable
   than it is.
+- **New sessions and open-ended research agents are gated; routine
+  specialist delegation is not.** No session — Director, a worker, or any
+  other — opens a new independent peer session, or launches an open-ended/
+  background research agent (e.g. an Explore, general-purpose, or fork-type
+  agent), without first asking Yon and having Yon specify the goal: state
+  why you think one is needed, then wait. This does **not** apply to the
+  routine Director → physicist → coder → verifier → aws-agent delegation
+  described in Section 3 — that stays pre-authorized and doesn't need
+  per-instance approval. The distinction is: spawning a *new* autonomous
+  session/agent beyond that established set needs a check-in first, because
+  each one carries its own separate, opaque token cost; using the five
+  specialists that are already part of this project's design doesn't.
 
 ## 3. Multi-agent structure
 
