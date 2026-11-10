@@ -1,0 +1,21 @@
+# Python 3.11. Pins marked [braket-arm] come from `pip list` of the local conda env
+# ~/miniforge3/envs/braket-arm (checked 2026-11-10). Do NOT use qiskit 2.0.0 (default
+# local Mac python): it over-counts gates.
+qiskit==2.3.0                # [braket-arm]
+qiskit-aer==0.17.2           # [braket-arm]
+numpy==2.2.6                 # [braket-arm]
+scipy==1.17.1                # [braket-arm]
+matplotlib==3.10.8           # [braket-arm]
+pandas==2.3.3                # [braket-arm]
+pillow==12.1.0               # [braket-arm]
+boto3==1.42.30               # [braket-arm]
+mitiq==1.0.0                 # [braket-arm]; used in notebooks only
+cirq-core==1.6.1             # [braket-arm]; imported by a notebook only (mitiq dependency)
+
+# From project logs (hardware runs of 2026-09-08), not the local env (which has 1.108.1):
+amazon-braket-sdk==1.113.0
+
+# UNVERIFIED version: imported (BraketProvider) but not installed in any env checked here.
+qiskit-braket-provider
+
+# Optional dev tooling (notebooks): nbstripout==0.9.1 [braket-arm]
