@@ -1,0 +1,27 @@
+# OS / IDE
+.DS_Store
+.idea/
+.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# Claude Code local state
+.claude/worktrees/
+.claude/settings.local.json
+
+# Secrets
+.env
+
+# Nested Overleaf git repo (its .git/config holds a token) - never commit
+write/
