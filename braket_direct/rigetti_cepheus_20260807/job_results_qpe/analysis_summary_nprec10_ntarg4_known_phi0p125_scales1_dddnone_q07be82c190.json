@@ -1,0 +1,81 @@
+{
+  "generated": "2026-08-28T05:42:51",
+  "synthetic": false,
+  "run": {
+    "n_prec": 10,
+    "n_targ": 4,
+    "state_mode": "known",
+    "phi": 0.125,
+    "ideal_bin": 128,
+    "scales": [
+      1
+    ],
+    "shots_per_task": 50000
+  },
+  "qubits": {
+    "measured_qubits": [
+      105,
+      106,
+      104,
+      107,
+      102,
+      103,
+      100,
+      101,
+      91,
+      99
+    ],
+    "clbit_to_phys": [
+      105,
+      106,
+      104,
+      107,
+      102,
+      103,
+      100,
+      101,
+      91,
+      99
+    ],
+    "provenance": "logged"
+  },
+  "batches": {
+    "mode": "pooled",
+    "provenance": "logged batch_id",
+    "ids": [
+      "20260807T123228Z"
+    ],
+    "anchors": {
+      "20260807T123228Z": {
+        "scale": 1,
+        "shots": 50000,
+        "raw": 0.00162,
+        "rem": null
+      }
+    }
+  },
+  "ddd": {
+    "sequence": "none",
+    "arms_present": [
+      "none"
+    ],
+    "deltas": null
+  },
+  "rem": null,
+  "rem_skip_reason": "no cal0/cal1 in this family",
+  "zne": null,
+  "zne_rem": null,
+  "table": [
+    {
+      "condition": "raw (lambda=1)",
+      "p_correct": 0.00162,
+      "tvd": 0.9983799999999982,
+      "phase_err": 0.4873046875,
+      "ci": null,
+      "valid": true
+    }
+  ],
+  "task_arns": {
+    "QPE lambda=1": "arn:aws:braket:us-west-1:767397707562:quantum-task/78a74e79-4e28-49c4-926d-93b47c9ff167"
+  }
+}

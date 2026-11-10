@@ -1,0 +1,160 @@
+{
+  "generated": "2026-08-28T05:33:57",
+  "synthetic": false,
+  "run": {
+    "n_prec": 10,
+    "n_targ": 3,
+    "state_mode": "haar",
+    "phi": null,
+    "ideal_bin": 370,
+    "scales": [
+      1
+    ],
+    "shots_per_task": 10000
+  },
+  "qubits": {
+    "measured_qubits": [
+      12,
+      13,
+      20,
+      10,
+      11,
+      9,
+      21,
+      3,
+      14,
+      22
+    ],
+    "clbit_to_phys": [
+      12,
+      13,
+      20,
+      10,
+      11,
+      9,
+      21,
+      3,
+      14,
+      22
+    ],
+    "provenance": "logged"
+  },
+  "batches": {
+    "mode": "pooled",
+    "provenance": "logged batch_id",
+    "ids": [
+      "20260807T122923Z"
+    ],
+    "anchors": {
+      "20260807T122923Z": {
+        "scale": 1,
+        "shots": 10000,
+        "raw": 0.0008,
+        "rem": 0.0
+      }
+    }
+  },
+  "ddd": {
+    "sequence": "none",
+    "arms_present": [
+      "none"
+    ],
+    "deltas": null
+  },
+  "rem": {
+    "method": "simplex",
+    "condition_number": 6.824047925378801,
+    "p_1_given_0": [
+      0.0998,
+      0.112,
+      0.017,
+      0.0464,
+      0.0766,
+      0.0422,
+      0.033,
+      0.0387,
+      0.0542,
+      0.0386
+    ],
+    "p_0_given_1": [
+      0.19440000000000002,
+      0.09760000000000002,
+      0.04530000000000001,
+      0.06440000000000001,
+      0.06969999999999998,
+      0.06220000000000003,
+      0.30100000000000005,
+      0.07489999999999997,
+      0.06669999999999998,
+      0.04159999999999997
+    ],
+    "bootstrap": {
+      "raw": {
+        "mean": 0.0007994,
+        "std": 0.0002954898789080163,
+        "lo": 0.0003,
+        "hi": 0.0014,
+        "n": 500
+      },
+      "rem": {
+        "mean": 3.1649423990329236e-05,
+        "std": 0.00013532070174428087,
+        "lo": 0.0,
+        "hi": 0.0004730847365880457,
+        "n": 500
+      },
+      "delta": {
+        "mean": -0.0007677505760096708,
+        "std": 0.0002579204193171178,
+        "lo": -0.0013,
+        "hi": -0.0003,
+        "n": 500
+      },
+      "condition_number": {
+        "mean": 6.824895546708732,
+        "std": 0.10807071051178921,
+        "lo": 6.612045522826111,
+        "hi": 7.055260457861959,
+        "n": 500
+      }
+    }
+  },
+  "rem_skip_reason": null,
+  "zne": null,
+  "zne_rem": null,
+  "table": [
+    {
+      "condition": "raw (lambda=1)",
+      "p_correct": 0.0008,
+      "tvd": 0.957148426731347,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.0007994,
+        "std": 0.0002954898789080163,
+        "lo": 0.0003,
+        "hi": 0.0014,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "REM (simplex)",
+      "p_correct": 0.0,
+      "tvd": 0.9685940304889784,
+      "phase_err": null,
+      "ci": {
+        "mean": 3.1649423990329236e-05,
+        "std": 0.00013532070174428087,
+        "lo": 0.0,
+        "hi": 0.0004730847365880457,
+        "n": 500
+      },
+      "valid": true
+    }
+  ],
+  "task_arns": {
+    "QPE lambda=1": "arn:aws:braket:us-west-1:767397707562:quantum-task/a5912185-eb88-4ca8-a58a-207cee45d2cb",
+    "readout calibration cal1": "arn:aws:braket:us-west-1:767397707562:quantum-task/ced2e9fa-f26a-43f9-b5fb-c8c08af0261e",
+    "readout calibration cal0": "arn:aws:braket:us-west-1:767397707562:quantum-task/d9a27fd9-7bc1-475b-8f7f-f575eefbe95f"
+  }
+}

@@ -382,6 +382,18 @@ class ErrorMitigation:
             elif name == "rz":
                 circ.rz(param, qubit)
             elif name == "id":
+                # KNOWN FORWARD-LOOKING GAP, not fixed here: this campaign
+                # has no DDD arm yet, but the mandatory "II" null control
+                # (see DDD_SEQUENCES / the class docstring) is built entirely
+                # out of this branch. device_caps.json's supportedOperations
+                # (fetched 2026-08-28, ionq_mitigation_common.IONQ_SUPPORTED_
+                # OPS) does NOT include `i` -- only x/y/z/h/s/si/t/ti/v/vi/rx/
+                # ry/rz/cnot/swap/xx/yy/zz. Under verbatim submission (now
+                # the default -- submit_ionq_mitigation.py) that means the II
+                # control will fail assert_supported_gates / the task itself
+                # outright the moment DDD is turned on, not silently
+                # recompile. Needs an rz(0)- or rx(0)-based null pulse (or an
+                # IONQ_SUPPORTED_OPS addition) before that happens.
                 circ.id(qubit)
             else:
                 raise ValueError(f"unsupported DD pulse gate {name!r}")

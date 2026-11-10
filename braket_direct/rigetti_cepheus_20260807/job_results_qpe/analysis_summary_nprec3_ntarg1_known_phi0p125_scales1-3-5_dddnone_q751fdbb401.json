@@ -1,0 +1,256 @@
+{
+  "generated": "2026-08-28T03:46:35",
+  "synthetic": false,
+  "run": {
+    "n_prec": 3,
+    "n_targ": 1,
+    "state_mode": "known",
+    "phi": 0.125,
+    "ideal_bin": 1,
+    "scales": [
+      1,
+      3,
+      5
+    ],
+    "shots_per_task": 10000
+  },
+  "qubits": {
+    "measured_qubits": [
+      100,
+      99,
+      101
+    ],
+    "clbit_to_phys": [
+      100,
+      99,
+      101
+    ],
+    "provenance": "logged"
+  },
+  "batches": {
+    "mode": "pooled",
+    "provenance": "logged batch_id",
+    "ids": [
+      "20260807T125346Z"
+    ],
+    "anchors": {
+      "20260807T125346Z": {
+        "scale": 1,
+        "shots": 10000,
+        "raw": 0.6513,
+        "rem": 0.6929508975364709
+      }
+    }
+  },
+  "ddd": {
+    "sequence": "none",
+    "arms_present": [
+      "none"
+    ],
+    "deltas": null
+  },
+  "rem": {
+    "method": "simplex",
+    "condition_number": 1.2223421064103153,
+    "p_1_given_0": [
+      0.0293,
+      0.0059,
+      0.0154
+    ],
+    "p_0_given_1": [
+      0.04700000000000004,
+      0.042300000000000004,
+      0.03639999999999999
+    ],
+    "bootstrap": {
+      "raw": {
+        "mean": 0.651423,
+        "std": 0.004506269402494234,
+        "lo": 0.6424475,
+        "hi": 0.660205,
+        "n": 500
+      },
+      "rem": {
+        "mean": 0.6930031931136141,
+        "std": 0.00541679082812176,
+        "lo": 0.6828562740565689,
+        "hi": 0.7039063635136571,
+        "n": 500
+      },
+      "delta": {
+        "mean": 0.04158019311361411,
+        "std": 0.0020859332708269814,
+        "lo": 0.03769442266215631,
+        "hi": 0.04571671877073445,
+        "n": 500
+      },
+      "condition_number": {
+        "mean": 1.222578418043396,
+        "std": 0.0062531801294440645,
+        "lo": 1.2095314610105627,
+        "hi": 1.2342849912723408,
+        "n": 500
+      }
+    }
+  },
+  "rem_skip_reason": null,
+  "zne": {
+    "fit": {
+      "richardson": 0.8203250000000001,
+      "linear": 0.7270666666666665,
+      "linear_slope": -0.09539999999999998,
+      "exponential": 0.8502592476570465,
+      "exponential_params": [
+        0.12201230899830187,
+        0.7282469386587447,
+        0.31910806878122894
+      ],
+      "model_spread": 0.12319258099038,
+      "unphysical": [],
+      "physical": true
+    },
+    "bootstrap": {
+      "point_estimate": {
+        "richardson": 0.8203250000000001,
+        "linear": 0.7270666666666665,
+        "linear_slope": -0.09539999999999998,
+        "exponential": 0.8502592476570465,
+        "exponential_params": [
+          0.12201230899830187,
+          0.7282469386587447,
+          0.31910806878122894
+        ],
+        "model_spread": 0.12319258099038,
+        "unphysical": [],
+        "physical": true
+      },
+      "ci": {
+        "richardson": {
+          "mean": 0.820326625,
+          "std": 0.011084569111682171,
+          "lo": 0.7983759374999997,
+          "hi": 0.8416090625,
+          "n": 500
+        },
+        "linear": {
+          "mean": 0.7271241833333332,
+          "std": 0.005729921623276834,
+          "lo": 0.7159031249999998,
+          "hi": 0.7379291666666664,
+          "n": 500
+        },
+        "exponential": {
+          "mean": 0.8507292104686496,
+          "std": 0.017180914724091927,
+          "lo": 0.8168786555298432,
+          "hi": 0.8864488085443086,
+          "n": 500
+        }
+      }
+    }
+  },
+  "zne_rem": {
+    "fit": {
+      "richardson": 0.8796534196445966,
+      "linear": 0.7753663510312666,
+      "linear_slope": -0.10437062583444426,
+      "exponential": 0.9141217177048809,
+      "exponential_params": [
+        0.1205050956802182,
+        0.7936166220246628,
+        0.3266824391426201
+      ],
+      "model_spread": 0.13875536667361432,
+      "unphysical": [],
+      "physical": true
+    },
+    "bootstrap": {
+      "richardson": {
+        "mean": 0.8793788110678972,
+        "std": 0.011929598840174003,
+        "lo": 0.8575992787732977,
+        "hi": 0.9033696682673147,
+        "n": 500
+      },
+      "linear": {
+        "mean": 0.7753657267382775,
+        "std": 0.006892741775100086,
+        "lo": 0.7617810982944472,
+        "hi": 0.7876703881384233,
+        "n": 500
+      },
+      "exponential": {
+        "mean": 0.9141797620047533,
+        "std": 0.01829925954639046,
+        "lo": 0.8802529814475902,
+        "hi": 0.9523657154941789,
+        "n": 500
+      }
+    }
+  },
+  "table": [
+    {
+      "condition": "raw (lambda=1)",
+      "p_correct": 0.6513,
+      "tvd": 0.3486999999999997,
+      "phase_err": 0.0,
+      "ci": {
+        "mean": 0.651423,
+        "std": 0.004506269402494234,
+        "lo": 0.6424475,
+        "hi": 0.660205,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "REM (simplex)",
+      "p_correct": 0.6929508975364709,
+      "tvd": 0.30704910246352873,
+      "phase_err": 0.0,
+      "ci": {
+        "mean": 0.6930031931136141,
+        "std": 0.00541679082812176,
+        "lo": 0.6828562740565689,
+        "hi": 0.7039063635136571,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "ZNE (linear)",
+      "p_correct": 0.7270666666666665,
+      "tvd": null,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.7271241833333332,
+        "std": 0.005729921623276834,
+        "lo": 0.7159031249999998,
+        "hi": 0.7379291666666664,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "ZNE+REM (linear)",
+      "p_correct": 0.7753663510312666,
+      "tvd": null,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.7753657267382775,
+        "std": 0.006892741775100086,
+        "lo": 0.7617810982944472,
+        "hi": 0.7876703881384233,
+        "n": 500
+      },
+      "valid": true
+    }
+  ],
+  "task_arns": {
+    "readout calibration cal0": "arn:aws:braket:us-west-1:767397707562:quantum-task/282840d4-0aaf-4700-bf2e-ecc8b16a8b28",
+    "readout calibration cal1": "arn:aws:braket:us-west-1:767397707562:quantum-task/7324f4f8-44fa-44dd-bb49-0d334be9ab4d",
+    "QPE lambda=1": "arn:aws:braket:us-west-1:767397707562:quantum-task/777334dd-2190-4622-ab4d-f2c7a475c844",
+    "QPE lambda=3": "arn:aws:braket:us-west-1:767397707562:quantum-task/93ceee10-4ba0-4b0d-a6f5-a1300bba3214",
+    "QPE lambda=5": "arn:aws:braket:us-west-1:767397707562:quantum-task/e96d3634-2f19-47bd-8a99-def77b064e76"
+  }
+}

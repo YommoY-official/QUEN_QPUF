@@ -25,3 +25,6 @@ __pycache__/
 
 # Nested Overleaf git repo (its .git/config holds a token) - never commit
 write/
+
+# Third-party reference papers (copyrighted; kept locally only)
+.claude/docs/references/*.pdf

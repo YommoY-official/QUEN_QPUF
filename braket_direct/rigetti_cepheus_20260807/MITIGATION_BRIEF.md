@@ -250,7 +250,7 @@ Combined (placement + DDD + REM + ZNE) extrapolates to **1.49** (Richardson) and
 the curve and the extrapolation multiplies that shift by its lever arm. The
 analysis layer now flags out-of-[0,1] results as *invalid*, not merely noisy.
 
-### ZNE viability is gate-fidelity-driven, not depth-driven
+### ZNE viability is gate-fidelity-driven, not depth-driven (simulation prediction — superseded below)
 
 | F2Q | model spread, n_prec=3 | n_prec=4 | usable? |
 |---|---|---|---|
@@ -260,6 +260,48 @@ analysis layer now flags out-of-[0,1] results as *invalid*, not merely noisy.
 
 **So whether ZNE is worth any hardware time depends entirely on Cepheus's real CZ
 fidelity, which we do not yet have** — 0.97 is a placeholder.
+
+*(2026-08-28 update: real median F2Q, fetched from the device, is 0.988842 —
+just under this table's 0.99 "usable" row. The point prediction survives;
+the criterion behind it does not. See the revision immediately below, drawn
+from all 37 real hardware run families.)*
+
+### Revision (2026-08-28, physicist review against all 37 real hardware run families)
+
+Replace the F2Q-vs-spread table above with a two-gate criterion stated in
+device quantities. The simulated table above predicted "usable at
+n_prec=3-4, model_spread ≈ 0.06-0.09" once real F2Q came in; hardware
+showed that prediction's headline number landed close, but for the wrong
+reason — the criterion driving it doesn't hold up.
+
+> **ZNE viability on Cepheus is set by placement quality and total circuit
+> duration vs T2, not by the chip-median F2Q.**
+>
+> Measured (2026-08-07): live-edge fCZ median 0.988842 (n=162, min 0.830,
+> max 0.9965); 31/193 CZ edges failed calibration; fRO median 0.955 (n=107,
+> min 0.530, max 0.988); T2 median 10.82 µs.
+>
+> ZNE is applicable to a QPE family only if **both** hold:
+> 1. `p(λ=1) − 1/2^n_prec > 5·√(p(1−p)/N_shots)` — there is a signal to
+>    extrapolate. Fails in every family with n_prec ≥ 8, and in 3 of 6 at
+>    n_prec = 5.
+> 2. `P_correct(λ)` decays monotonically with slope significance > 5σ.
+>    Fails in 8 of 11 families with n_prec ≥ 5, and *inverts* in one
+>    n_prec = 4 family that landed on a block containing a failed coupler.
+>
+> On this dataset both hold in 10 of 26 ZNE-capable families; adding
+> "models agree" leaves **6 of 26**, at n_prec ∈ {2, 3, 3, 4, 4, 6}. The
+> empirical ceiling is **n_prec ≈ 4–6 given a clean placement**, and the
+> same n_prec can pass or fail depending on which qubits it lands on — a
+> 6.4× `P_correct` swing at fixed n_prec, fixed seed, 14 minutes apart.
+>
+> `model_spread` should not be used as the viability gate. With
+> `scales=[1,3,5]` the 3-parameter exponential `a + b·e^{−cλ}` exactly
+> interpolates 3 points, producing spreads up to 1226 on a [0,1]-bounded
+> quantity; and once `P_correct → 1/2^n_prec` all models agree on "zero,"
+> so the metric goes to 1e-4 on the *deadest* circuits. Either drop the
+> exponential model at 3 points, or require ≥ 4 λ values whenever it is
+> fit.
 
 ---
 

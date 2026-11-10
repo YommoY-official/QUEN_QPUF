@@ -1,0 +1,160 @@
+{
+  "generated": "2026-08-28T05:15:18",
+  "synthetic": false,
+  "run": {
+    "n_prec": 10,
+    "n_targ": 2,
+    "state_mode": "haar",
+    "phi": null,
+    "ideal_bin": 279,
+    "scales": [
+      1
+    ],
+    "shots_per_task": 10000
+  },
+  "qubits": {
+    "measured_qubits": [
+      12,
+      13,
+      20,
+      11,
+      10,
+      2,
+      9,
+      15,
+      14,
+      23
+    ],
+    "clbit_to_phys": [
+      12,
+      13,
+      20,
+      11,
+      10,
+      2,
+      9,
+      15,
+      14,
+      23
+    ],
+    "provenance": "logged"
+  },
+  "batches": {
+    "mode": "pooled",
+    "provenance": "logged batch_id",
+    "ids": [
+      "20260807T122830Z"
+    ],
+    "anchors": {
+      "20260807T122830Z": {
+        "scale": 1,
+        "shots": 10000,
+        "raw": 0.0006,
+        "rem": 0.00018049630642238452
+      }
+    }
+  },
+  "ddd": {
+    "sequence": "none",
+    "arms_present": [
+      "none"
+    ],
+    "deltas": null
+  },
+  "rem": {
+    "method": "simplex",
+    "condition_number": 4.6852289595878505,
+    "p_1_given_0": [
+      0.0988,
+      0.1203,
+      0.0215,
+      0.0981,
+      0.0472,
+      0.0964,
+      0.0426,
+      0.0119,
+      0.0602,
+      0.0072
+    ],
+    "p_0_given_1": [
+      0.19469999999999998,
+      0.07740000000000002,
+      0.04690000000000005,
+      0.06540000000000001,
+      0.06869999999999998,
+      0.08940000000000003,
+      0.060799999999999965,
+      0.04710000000000003,
+      0.03469999999999995,
+      0.05449999999999999
+    ],
+    "bootstrap": {
+      "raw": {
+        "mean": 0.0006002000000000001,
+        "std": 0.0002475935482403783,
+        "lo": 0.0002,
+        "hi": 0.0012,
+        "n": 500
+      },
+      "rem": {
+        "mean": 0.00030477181532737957,
+        "std": 0.00038057414512186906,
+        "lo": 0.0,
+        "hi": 0.00134958701830926,
+        "n": 500
+      },
+      "delta": {
+        "mean": -0.00029542818467262043,
+        "std": 0.00019734558010678664,
+        "lo": -0.0006,
+        "hi": 0.00023551887865126637,
+        "n": 500
+      },
+      "condition_number": {
+        "mean": 4.685422637215421,
+        "std": 0.06535791292232232,
+        "lo": 4.559862363696893,
+        "hi": 4.832831892241843,
+        "n": 500
+      }
+    }
+  },
+  "rem_skip_reason": null,
+  "zne": null,
+  "zne_rem": null,
+  "table": [
+    {
+      "condition": "raw (lambda=1)",
+      "p_correct": 0.0006,
+      "tvd": 0.9696044623211295,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.0006002000000000001,
+        "std": 0.0002475935482403783,
+        "lo": 0.0002,
+        "hi": 0.0012,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "REM (simplex)",
+      "p_correct": 0.00018049630642238452,
+      "tvd": 0.9710123303974048,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.00030477181532737957,
+        "std": 0.00038057414512186906,
+        "lo": 0.0,
+        "hi": 0.00134958701830926,
+        "n": 500
+      },
+      "valid": true
+    }
+  ],
+  "task_arns": {
+    "QPE lambda=1": "arn:aws:braket:us-west-1:767397707562:quantum-task/3cac319d-e4fb-495e-b3ef-d833d80da2ab",
+    "readout calibration cal1": "arn:aws:braket:us-west-1:767397707562:quantum-task/8cac2740-1fa0-4831-b594-8b16380be140",
+    "readout calibration cal0": "arn:aws:braket:us-west-1:767397707562:quantum-task/d6d9d1db-0c1b-42f1-b1b5-2364f2c7f743"
+  }
+}

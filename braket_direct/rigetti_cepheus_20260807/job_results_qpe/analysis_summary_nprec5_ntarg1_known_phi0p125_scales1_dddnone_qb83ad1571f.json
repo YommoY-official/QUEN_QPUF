@@ -1,0 +1,140 @@
+{
+  "generated": "2026-08-28T03:47:07",
+  "synthetic": false,
+  "run": {
+    "n_prec": 5,
+    "n_targ": 1,
+    "state_mode": "known",
+    "phi": 0.125,
+    "ideal_bin": 4,
+    "scales": [
+      1
+    ],
+    "shots_per_task": 10000
+  },
+  "qubits": {
+    "measured_qubits": [
+      2,
+      1,
+      3,
+      0,
+      4
+    ],
+    "clbit_to_phys": [
+      2,
+      1,
+      3,
+      0,
+      4
+    ],
+    "provenance": "logged"
+  },
+  "batches": {
+    "mode": "pooled",
+    "provenance": "logged batch_id",
+    "ids": [
+      "20260807T122612Z"
+    ],
+    "anchors": {
+      "20260807T122612Z": {
+        "scale": 1,
+        "shots": 10000,
+        "raw": 0.0414,
+        "rem": 0.03871215819031178
+      }
+    }
+  },
+  "ddd": {
+    "sequence": "none",
+    "arms_present": [
+      "none"
+    ],
+    "deltas": null
+  },
+  "rem": {
+    "method": "simplex",
+    "condition_number": 2.1093710392696425,
+    "p_1_given_0": [
+      0.0783,
+      0.0607,
+      0.0409,
+      0.0195,
+      0.0207
+    ],
+    "p_0_given_1": [
+      0.08609999999999995,
+      0.10809999999999997,
+      0.08509999999999995,
+      0.06330000000000002,
+      0.08720000000000006
+    ],
+    "bootstrap": {
+      "raw": {
+        "mean": 0.041354,
+        "std": 0.002068972037167531,
+        "lo": 0.0374,
+        "hi": 0.0456525,
+        "n": 500
+      },
+      "rem": {
+        "mean": 0.03863827464244376,
+        "std": 0.0028921967555175965,
+        "lo": 0.03310488252531562,
+        "hi": 0.04446964703848373,
+        "n": 500
+      },
+      "delta": {
+        "mean": -0.00271572535755624,
+        "std": 0.0009697328484294781,
+        "lo": -0.004586838198362059,
+        "hi": -0.0007448219923418199,
+        "n": 500
+      },
+      "condition_number": {
+        "mean": 2.110140972864865,
+        "std": 0.021161734706884493,
+        "lo": 2.0689702898374893,
+        "hi": 2.15256878513822,
+        "n": 500
+      }
+    }
+  },
+  "rem_skip_reason": null,
+  "zne": null,
+  "zne_rem": null,
+  "table": [
+    {
+      "condition": "raw (lambda=1)",
+      "p_correct": 0.0414,
+      "tvd": 0.9585999999999993,
+      "phase_err": 0.25,
+      "ci": {
+        "mean": 0.041354,
+        "std": 0.002068972037167531,
+        "lo": 0.0374,
+        "hi": 0.0456525,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "REM (simplex)",
+      "p_correct": 0.03871215819031178,
+      "tvd": 0.9612878418096876,
+      "phase_err": 0.25,
+      "ci": {
+        "mean": 0.03863827464244376,
+        "std": 0.0028921967555175965,
+        "lo": 0.03310488252531562,
+        "hi": 0.04446964703848373,
+        "n": 500
+      },
+      "valid": true
+    }
+  ],
+  "task_arns": {
+    "readout calibration cal0": "arn:aws:braket:us-west-1:767397707562:quantum-task/0fe5a458-f2b0-4d55-8ead-0d4955099af8",
+    "QPE lambda=1": "arn:aws:braket:us-west-1:767397707562:quantum-task/39a6a1c1-a2c7-4be3-a188-e1b3f18dc792",
+    "readout calibration cal1": "arn:aws:braket:us-west-1:767397707562:quantum-task/94029822-2421-4503-a21b-fb3c675e2234"
+  }
+}

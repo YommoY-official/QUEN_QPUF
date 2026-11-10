@@ -8,9 +8,10 @@ braket_direct/rigetti_cepheus_20260807/mitig_analysis.py -- this half of the
 pipeline (bitstring decoding, REM inversion, ZNE extrapolation, bootstrap
 CIs) has nothing device-specific in it. What changed for IonQ is confined to
 the pre-flight `validate()` harness at the bottom: the noise model's basis
-gates (rz/rx/rxx instead of rz/rx/cz) and its fidelity defaults (F1Q/F2Q
-pulled from noise_mitigation/ionq_noise_mitig.py's real IonQ values, not
-Rigetti's placeholders).
+gates (rz/rx/rxx instead of rz/rx/cz) and its fidelity/readout defaults
+(F1Q/F2Q/p_readout, calibration-derived from device_properties_raw.json,
+fetched live 2026-08-28 -- see validate()'s docstring -- not Rigetti's
+placeholders).
 
 `error_mitig_ionq.py` builds circuits. This file consumes results. The split
 is along a real seam -- REM and ZNE each have a circuit-building half (there)
@@ -455,10 +456,29 @@ def bootstrap_zne(counts_by_scale: dict[float, dict], n_prec: int,
     point's standard error, so a CI built from per-lambda errors understates
     the real uncertainty. Resample every lambda's counts, refit, extrapolate,
     and take the spread of the extrapolated values.
+
+    Also returns a CI on Delta = P_extrap - P_correct(lambda=1) -- the number
+    the campaign actually reports ("did ZNE help"), not just a CI on the
+    extrapolant by itself.
+
+    CRITICAL: lambda=1's counts are simultaneously the ZNE ladder's first
+    rung AND the unmitigated baseline -- they are literally the same counts.
+    So each draw resamples lambda=1 EXACTLY ONCE and uses that one resample
+    on both sides of the subtraction (as `vals[base_idx]`, already inside the
+    ladder loop below). Resampling lambda=1 a second time, independently, for
+    the "baseline" side (what bootstrap_delta_unpaired does for genuinely
+    separate tasks) would treat it as an independent second experiment and
+    inflate the Delta interval -- see bootstrap_delta_unpaired's docstring
+    for that case; this is deliberately NOT that case.
     """
     rng = np.random.default_rng(seed)
     scales = sorted(counts_by_scale)
+    if 1.0 not in scales:
+        raise ValueError("bootstrap_zne needs a lambda=1.0 entry to define "
+                         "the Delta baseline")
+    base_idx = scales.index(1.0)
     per_model: dict[str, list] = {m: [] for m in models}
+    delta_per_model: dict[str, list] = {m: [] for m in models}
 
     for _ in range(n_boot):
         vals = []
@@ -467,16 +487,95 @@ def bootstrap_zne(counts_by_scale: dict[float, dict], n_prec: int,
             p = to_probabilities(counts_to_m(r, n_prec, **conv), n_prec)
             vals.append(p_correct(p, ideal_bin))
         fit = extrapolate(scales, vals, models=models)
+        baseline = vals[base_idx]           # SAME resample used below, not a fresh one
         for m in models:
             per_model[m].append(fit.get(m))
+            v = fit.get(m)
+            delta_per_model[m].append(None if v is None else v - baseline)
 
+    baseline_point = p_correct(
+        to_probabilities(counts_to_m(counts_by_scale[1.0], n_prec, **conv), n_prec),
+        ideal_bin)
     point = extrapolate(
         scales,
         [p_correct(to_probabilities(counts_to_m(counts_by_scale[s], n_prec, **conv),
                                     n_prec), ideal_bin) for s in scales],
         models=models)
+    delta_point = {m: (None if point.get(m) is None else point[m] - baseline_point)
+                   for m in models}
     return {"point_estimate": point,
-            "ci": {m: bootstrap_ci(v) for m, v in per_model.items()}}
+            "ci": {m: bootstrap_ci(v) for m, v in per_model.items()},
+            "delta_point_estimate": delta_point,
+            "delta_ci": {m: bootstrap_ci(v) for m, v in delta_per_model.items()}}
+
+
+def bootstrap_zne_rem(counts_by_scale: dict[float, dict], cal0: dict, cal1: dict,
+                      n_prec: int, ideal_bin: int, n_meas: int,
+                      n_boot: int = 500, seed: int = 0,
+                      models=("richardson", "linear", "exponential"),
+                      method: str = "simplex", **conv) -> dict:
+    """
+    bootstrap_zne, but with REM applied to every lambda before the fit.
+
+    Ported from braket_direct/rigetti_cepheus_20260807/run_all_families.py's
+    local `bootstrap_zne_rem` helper (~line 217) -- promoted to a proper
+    module-level function here since this campaign's driver needs it too and
+    there is no reason for two copies to drift.
+
+    Per draw: resample cal0/cal1 ONCE and build one confusion matrix A from
+    that resample; resample every lambda's counts ONCE; REM-correct each
+    lambda with that same A; fit; extrapolate. The lambda=1 resample is
+    reused for both the ladder's first rung and the Delta baseline below --
+    same single-resample discipline as bootstrap_zne above, and for the same
+    reason: it is the same counts, not a second experiment.
+
+    Delta baseline is the RAW (no REM) p_correct at lambda=1, matching
+    run_all_families.py's rollup_row -- `delta_zne_rem` there is defined
+    against the fully unmitigated "raw (lambda=1)" row, not the REM-only
+    row, so ZNE+REM's reported benefit is against the same reference every
+    other technique in the table is compared to.
+    """
+    rng = np.random.default_rng(seed)
+    scales = sorted(counts_by_scale)
+    if 1.0 not in scales:
+        raise ValueError("bootstrap_zne_rem needs a lambda=1.0 entry to "
+                         "define the Delta baseline")
+    base_idx = scales.index(1.0)
+    per_model: dict[str, list] = {m: [] for m in models}
+    delta_per_model: dict[str, list] = {m: [] for m in models}
+
+    for _ in range(n_boot):
+        a = tensored_confusion(
+            confusion_matrices(resample_counts(cal0, rng), resample_counts(cal1, rng),
+                               n_meas, **conv)[:n_prec])
+        vals, baseline_raw = [], None
+        for i, s in enumerate(scales):
+            r = resample_counts(counts_by_scale[s], rng)
+            p_raw = to_probabilities(counts_to_m(r, n_prec, **conv), n_prec)
+            vals.append(p_correct(rem_correct(p_raw, a, method=method), ideal_bin))
+            if i == base_idx:
+                baseline_raw = p_correct(p_raw, ideal_bin)     # same resample, no REM
+        fit = extrapolate(scales, vals, models=models)
+        for m in models:
+            per_model[m].append(fit.get(m))
+            v = fit.get(m)
+            delta_per_model[m].append(None if v is None else v - baseline_raw)
+
+    a_point = tensored_confusion(confusion_matrices(cal0, cal1, n_meas, **conv)[:n_prec])
+    vals_point, baseline_point_raw = [], None
+    for i, s in enumerate(scales):
+        p_raw = to_probabilities(counts_to_m(counts_by_scale[s], n_prec, **conv), n_prec)
+        vals_point.append(p_correct(rem_correct(p_raw, a_point, method=method), ideal_bin))
+        if i == base_idx:
+            baseline_point_raw = p_correct(p_raw, ideal_bin)
+    point = extrapolate(scales, vals_point, models=models)
+    delta_point = {m: (None if point.get(m) is None else point[m] - baseline_point_raw)
+                   for m in models}
+
+    return {"point_estimate": point,
+            "ci": {m: bootstrap_ci(v) for m, v in per_model.items()},
+            "delta_point_estimate": delta_point,
+            "delta_ci": {m: bootstrap_ci(v) for m, v in delta_per_model.items()}}
 
 
 # =========================================================================
@@ -565,18 +664,22 @@ def _run(circ, nm, shots, seed):
 
 
 def validate(n_prec: int = 4, phi: float = 1 / 8, shots: int = 20000,
-             f_1q: float = 0.9998, f_2q: float = 0.985, p_readout: float = 0.03,
+             f_1q: float = 0.9998, f_2q: float = 0.9882, p_readout: float = 0.006,
              detuning_rad_per_s: float = 2.0e5, n_boot: int = 200,
              seed: int = 7) -> dict:
     """
     Run every technique in noisy simulation and report whether it helps.
 
-    Defaults for f_1q/f_2q are IonQ Forte-Enterprise-1's stated typical
-    values (F1Q=0.9998, F2Q=0.985 -- noise_mitigation/ionq_noise_mitig.py),
-    NOT the Rigetti placeholders (0.999/0.97) the template this file was
-    copied from used. p_readout=0.03 and detuning_rad_per_s are still
-    placeholders -- no IonQ readout-error rate or drift spectral density is
-    known to this project (MITIGATION_BRIEF_IONQ.md Section 9.2).
+    f_1q/f_2q/p_readout are now CALIBRATION-DERIVED, not placeholders:
+    device_properties_raw.json (fetched live from Forte-Enterprise-1,
+    2026-08-28) gives provider.fidelity.{1Q,2Q,spam}.mean = 0.9998 / 0.9882 /
+    0.994 -- matching ionq_mitigation_common.F1Q/F2Q/SPAM_FIDELITY.
+    p_readout = 1 - SPAM_FIDELITY = 0.006 is this validation harness's first
+    use of a real per-qubit readout-error rate for this device -- SPAM is
+    exactly the channel REM's confusion matrix corrects, so this number
+    matters more here than F1Q/F2Q do. detuning_rad_per_s remains a
+    placeholder: no IonQ drift spectral density is known to this project
+    (MITIGATION_BRIEF_IONQ.md Section 9.2).
     """
     from qiskit import transpile
     from ionq_mitigation_common import (known_phase_unitary, build_qpe_circuit,
@@ -742,8 +845,8 @@ def main():
     ap.add_argument("--n-prec", type=int, default=4)
     ap.add_argument("--shots", type=int, default=20000)
     ap.add_argument("--f1q", type=float, default=0.9998)
-    ap.add_argument("--f2q", type=float, default=0.985)
-    ap.add_argument("--readout-err", type=float, default=0.03)
+    ap.add_argument("--f2q", type=float, default=0.9882)
+    ap.add_argument("--readout-err", type=float, default=0.006)
     ap.add_argument("--detuning", type=float, default=2.0e5)
     ap.add_argument("--n-boot", type=int, default=200)
     args = ap.parse_args()

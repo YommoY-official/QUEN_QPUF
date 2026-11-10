@@ -1,0 +1,132 @@
+{
+  "generated": "2026-08-28T03:46:34",
+  "synthetic": false,
+  "run": {
+    "n_prec": 3,
+    "n_targ": 1,
+    "state_mode": "known",
+    "phi": 0.125,
+    "ideal_bin": 1,
+    "scales": [
+      1
+    ],
+    "shots_per_task": 1000
+  },
+  "qubits": {
+    "measured_qubits": [
+      9,
+      0,
+      1
+    ],
+    "clbit_to_phys": [
+      1,
+      0,
+      9
+    ],
+    "provenance": "re-derived (transpile_for_rigetti)"
+  },
+  "batches": {
+    "mode": "pooled",
+    "provenance": "inferred from timestamps (gap > 30s)",
+    "ids": [
+      "inferred-1"
+    ],
+    "anchors": {
+      "inferred-1": {
+        "scale": 1,
+        "shots": 1000,
+        "raw": 0.08,
+        "rem": 0.058377381374713405
+      }
+    }
+  },
+  "ddd": {
+    "sequence": "none",
+    "arms_present": [
+      "none"
+    ],
+    "deltas": null
+  },
+  "rem": {
+    "method": "simplex",
+    "condition_number": 1.5365966961851674,
+    "p_1_given_0": [
+      0.092,
+      0.02,
+      0.02
+    ],
+    "p_0_given_1": [
+      0.10799999999999998,
+      0.05700000000000005,
+      0.07599999999999996
+    ],
+    "bootstrap": {
+      "raw": {
+        "mean": 0.079122,
+        "std": 0.008687811700554321,
+        "lo": 0.064,
+        "hi": 0.096,
+        "n": 500
+      },
+      "rem": {
+        "mean": 0.05746632321319124,
+        "std": 0.011628322002147359,
+        "lo": 0.03572586942614313,
+        "hi": 0.079077774981982,
+        "n": 500
+      },
+      "delta": {
+        "mean": -0.02165567678680875,
+        "std": 0.004382670510971821,
+        "lo": -0.030641816196411337,
+        "hi": -0.013541912750299085,
+        "n": 500
+      },
+      "condition_number": {
+        "mean": 1.5368828332040902,
+        "std": 0.03589957494074671,
+        "lo": 1.4655491668542686,
+        "hi": 1.6128458460545045,
+        "n": 500
+      }
+    }
+  },
+  "rem_skip_reason": null,
+  "zne": null,
+  "zne_rem": null,
+  "table": [
+    {
+      "condition": "raw (lambda=1)",
+      "p_correct": 0.08,
+      "tvd": 0.9199999999999997,
+      "phase_err": 0.375,
+      "ci": {
+        "mean": 0.079122,
+        "std": 0.008687811700554321,
+        "lo": 0.064,
+        "hi": 0.096,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "REM (simplex)",
+      "p_correct": 0.058377381374713405,
+      "tvd": 0.9416226186252863,
+      "phase_err": 0.5,
+      "ci": {
+        "mean": 0.05746632321319124,
+        "std": 0.011628322002147359,
+        "lo": 0.03572586942614313,
+        "hi": 0.079077774981982,
+        "n": 500
+      },
+      "valid": true
+    }
+  ],
+  "task_arns": {
+    "readout calibration cal1": "arn:aws:braket:us-west-1:767397707562:quantum-task/2416bd25-bfde-48c7-a198-d03aea300735",
+    "readout calibration cal0": "arn:aws:braket:us-west-1:767397707562:quantum-task/36796e11-5ee3-4d29-a652-ae087b84c030",
+    "QPE lambda=1": "arn:aws:braket:us-west-1:767397707562:quantum-task/692e3787-3055-419d-92fd-f77c4a16af9a"
+  }
+}

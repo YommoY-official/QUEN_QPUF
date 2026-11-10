@@ -1,0 +1,266 @@
+{
+  "generated": "2026-08-28T03:47:01",
+  "synthetic": false,
+  "run": {
+    "n_prec": 4,
+    "n_targ": 2,
+    "state_mode": "known",
+    "phi": 0.125,
+    "ideal_bin": 2,
+    "scales": [
+      1,
+      3,
+      5
+    ],
+    "shots_per_task": 10000
+  },
+  "qubits": {
+    "measured_qubits": [
+      66,
+      65,
+      64,
+      63
+    ],
+    "clbit_to_phys": [
+      66,
+      65,
+      64,
+      63
+    ],
+    "provenance": "logged"
+  },
+  "batches": {
+    "mode": "pooled",
+    "provenance": "logged batch_id",
+    "ids": [
+      "20260807T124241Z"
+    ],
+    "anchors": {
+      "20260807T124241Z": {
+        "scale": 1,
+        "shots": 10000,
+        "raw": 0.0879,
+        "rem": 0.08669828873166659
+      }
+    }
+  },
+  "ddd": {
+    "sequence": "none",
+    "arms_present": [
+      "none"
+    ],
+    "deltas": null
+  },
+  "rem": {
+    "method": "simplex",
+    "condition_number": 1.2498747696827732,
+    "p_1_given_0": [
+      0.0116,
+      0.0142,
+      0.0141,
+      0.0138
+    ],
+    "p_0_given_1": [
+      0.03520000000000001,
+      0.032399999999999984,
+      0.03759999999999997,
+      0.038799999999999946
+    ],
+    "bootstrap": {
+      "raw": {
+        "mean": 0.0879442,
+        "std": 0.002911745676698352,
+        "lo": 0.0823475,
+        "hi": 0.0934,
+        "n": 500
+      },
+      "rem": {
+        "mean": 0.08675147763201906,
+        "std": 0.0032004446958515597,
+        "lo": 0.08060569135381558,
+        "hi": 0.09260721489515784,
+        "n": 500
+      },
+      "delta": {
+        "mean": -0.001192722367980933,
+        "std": 0.00046515983401223903,
+        "lo": -0.0020994698044716066,
+        "hi": -0.00034292691458803423,
+        "n": 500
+      },
+      "condition_number": {
+        "mean": 1.2501617952052926,
+        "std": 0.006752994233341841,
+        "lo": 1.2368252084868776,
+        "hi": 1.2638825820524822,
+        "n": 500
+      }
+    }
+  },
+  "rem_skip_reason": null,
+  "zne": {
+    "fit": {
+      "richardson": 0.11958750000000003,
+      "linear": 0.09037499999999997,
+      "linear_slope": -0.008625000000000004,
+      "exponential": 122.19874742430383,
+      "exponential_params": [
+        0.05279999862554941,
+        122.14594742567829,
+        8.154771387549099
+      ],
+      "model_spread": 122.10837242430384,
+      "unphysical": [
+        "exponential"
+      ],
+      "physical": false
+    },
+    "bootstrap": {
+      "point_estimate": {
+        "richardson": 0.11958750000000003,
+        "linear": 0.09037499999999997,
+        "linear_slope": -0.008625000000000004,
+        "exponential": 122.19874742430383,
+        "exponential_params": [
+          0.05279999862554941,
+          122.14594742567829,
+          8.154771387549099
+        ],
+        "model_spread": 122.10837242430384,
+        "unphysical": [
+          "exponential"
+        ],
+        "physical": false
+      },
+      "ci": {
+        "richardson": {
+          "mean": 0.119270375,
+          "std": 0.006257686969983687,
+          "lo": 0.106909375,
+          "hi": 0.13116468749999996,
+          "n": 500
+        },
+        "linear": {
+          "mean": 0.09018691666666663,
+          "std": 0.0034466260773110065,
+          "lo": 0.08345062499999999,
+          "hi": 0.09676916666666664,
+          "n": 500
+        },
+        "exponential": {
+          "mean": 73.3189105515269,
+          "std": 60.88305561181769,
+          "lo": 0.1445656819973646,
+          "hi": 202.7941934847288,
+          "n": 496
+        }
+      }
+    }
+  },
+  "zne_rem": {
+    "fit": {
+      "richardson": 0.12051473556620429,
+      "linear": 0.08915263994048164,
+      "linear_slope": -0.009056897656335638,
+      "exponential": 120.11896685195137,
+      "exponential_params": [
+        0.04962377444496484,
+        120.0693430775064,
+        8.082895671471762
+      ],
+      "model_spread": 120.02981421201089,
+      "unphysical": [
+        "exponential"
+      ],
+      "physical": false
+    },
+    "bootstrap": {
+      "richardson": {
+        "mean": 0.12038314996935402,
+        "std": 0.006244707165967469,
+        "lo": 0.10946139992082939,
+        "hi": 0.1321678674204377,
+        "n": 500
+      },
+      "linear": {
+        "mean": 0.08909070470514548,
+        "std": 0.003613455058691207,
+        "lo": 0.08172388427499634,
+        "hi": 0.09549928071225589,
+        "n": 500
+      },
+      "exponential": {
+        "mean": 82.36853462717461,
+        "std": 67.03510830559206,
+        "lo": 0.14908512171667174,
+        "hi": 227.1665237724376,
+        "n": 499
+      }
+    }
+  },
+  "table": [
+    {
+      "condition": "raw (lambda=1)",
+      "p_correct": 0.0879,
+      "tvd": 0.912099999999999,
+      "phase_err": 0.25,
+      "ci": {
+        "mean": 0.0879442,
+        "std": 0.002911745676698352,
+        "lo": 0.0823475,
+        "hi": 0.0934,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "REM (simplex)",
+      "p_correct": 0.08669828873166659,
+      "tvd": 0.9133017112683325,
+      "phase_err": 0.25,
+      "ci": {
+        "mean": 0.08675147763201906,
+        "std": 0.0032004446958515597,
+        "lo": 0.08060569135381558,
+        "hi": 0.09260721489515784,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "ZNE (linear)",
+      "p_correct": 0.09037499999999997,
+      "tvd": null,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.09018691666666663,
+        "std": 0.0034466260773110065,
+        "lo": 0.08345062499999999,
+        "hi": 0.09676916666666664,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "ZNE+REM (linear)",
+      "p_correct": 0.08915263994048164,
+      "tvd": null,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.08909070470514548,
+        "std": 0.003613455058691207,
+        "lo": 0.08172388427499634,
+        "hi": 0.09549928071225589,
+        "n": 500
+      },
+      "valid": true
+    }
+  ],
+  "task_arns": {
+    "readout calibration cal0": "arn:aws:braket:us-west-1:767397707562:quantum-task/85e50b75-c020-4469-91b0-e0ad9eb6c0f0",
+    "QPE lambda=1": "arn:aws:braket:us-west-1:767397707562:quantum-task/8e956067-a84a-44ba-b4ed-d10ae957e824",
+    "QPE lambda=5": "arn:aws:braket:us-west-1:767397707562:quantum-task/c8181e43-1c08-4a7b-a87e-ab56bedba329",
+    "QPE lambda=3": "arn:aws:braket:us-west-1:767397707562:quantum-task/d9563f74-812e-426f-8322-4035e980af58",
+    "readout calibration cal1": "arn:aws:braket:us-west-1:767397707562:quantum-task/e04f9a11-bf1a-4b73-8c20-ded04ef03726"
+  }
+}

@@ -1,0 +1,260 @@
+{
+  "generated": "2026-08-28T03:46:51",
+  "synthetic": false,
+  "run": {
+    "n_prec": 4,
+    "n_targ": 2,
+    "state_mode": "haar",
+    "phi": null,
+    "ideal_bin": 4,
+    "scales": [
+      1,
+      3,
+      5
+    ],
+    "shots_per_task": 5000
+  },
+  "qubits": {
+    "measured_qubits": [
+      2,
+      1,
+      3,
+      0
+    ],
+    "clbit_to_phys": [
+      2,
+      1,
+      3,
+      0
+    ],
+    "provenance": "logged"
+  },
+  "batches": {
+    "mode": "pooled",
+    "provenance": "inferred from timestamps (gap > 30s)",
+    "ids": [
+      "inferred-1"
+    ],
+    "anchors": {
+      "inferred-1": {
+        "scale": 1,
+        "shots": 5000,
+        "raw": 0.049,
+        "rem": 0.04464438339440327
+      }
+    }
+  },
+  "ddd": {
+    "sequence": "none",
+    "arms_present": [
+      "none"
+    ],
+    "deltas": null
+  },
+  "rem": {
+    "method": "simplex",
+    "condition_number": 1.7792132371136402,
+    "p_1_given_0": [
+      0.086,
+      0.058,
+      0.0422,
+      0.017
+    ],
+    "p_0_given_1": [
+      0.09019999999999995,
+      0.1008,
+      0.06579999999999997,
+      0.05620000000000003
+    ],
+    "bootstrap": {
+      "raw": {
+        "mean": 0.049152,
+        "std": 0.003131368220741172,
+        "lo": 0.043495,
+        "hi": 0.05550499999999999,
+        "n": 500
+      },
+      "rem": {
+        "mean": 0.044819191901285485,
+        "std": 0.004260130905625043,
+        "lo": 0.03718484867204762,
+        "hi": 0.05350317424715209,
+        "n": 500
+      },
+      "delta": {
+        "mean": -0.004332808098714515,
+        "std": 0.0013427203381738378,
+        "lo": -0.0068685010245643895,
+        "hi": -0.001742935908019015,
+        "n": 500
+      },
+      "condition_number": {
+        "mean": 1.7801508877126972,
+        "std": 0.020821034172819875,
+        "lo": 1.7415080054714536,
+        "hi": 1.8226570738062724,
+        "n": 500
+      }
+    }
+  },
+  "rem_skip_reason": null,
+  "zne": {
+    "fit": {
+      "richardson": 0.054425000000000015,
+      "linear": 0.05078333333333331,
+      "linear_slope": -0.0025499999999999976,
+      "exponential": 0.05644839172727763,
+      "exponential_params": [
+        0.03709565217391305,
+        0.019352739553364577,
+        0.4859302915144835
+      ],
+      "model_spread": 0.005665058393944315,
+      "unphysical": [],
+      "physical": true
+    },
+    "bootstrap": {
+      "point_estimate": {
+        "richardson": 0.054425000000000015,
+        "linear": 0.05078333333333331,
+        "linear_slope": -0.0025499999999999976,
+        "exponential": 0.05644839172727763,
+        "exponential_params": [
+          0.03709565217391305,
+          0.019352739553364577,
+          0.4859302915144835
+        ],
+        "model_spread": 0.005665058393944315,
+        "unphysical": [],
+        "physical": true
+      },
+      "ci": {
+        "richardson": {
+          "mean": 0.05466075,
+          "std": 0.006823772301619442,
+          "lo": 0.041411874999999994,
+          "hi": 0.06704687499999999,
+          "n": 500
+        },
+        "linear": {
+          "mean": 0.05067676666666665,
+          "std": 0.00358462579276391,
+          "lo": 0.04360374999999998,
+          "hi": 0.05778124999999997,
+          "n": 500
+        },
+        "exponential": {
+          "mean": 5.40102353232492,
+          "std": 11.276769921989542,
+          "lo": 0.045452085594575274,
+          "hi": 34.73703190634234,
+          "n": 490
+        }
+      }
+    }
+  },
+  "zne_rem": {
+    "fit": {
+      "richardson": 0.050993145699376144,
+      "linear": 0.04689603587010244,
+      "linear_slope": -0.003114201913441007,
+      "exponential": 0.05299611677888054,
+      "exponential_params": [
+        0.029626350429905704,
+        0.023369766348974832,
+        0.4421914739219604
+      ],
+      "model_spread": 0.006100080908778102,
+      "unphysical": [],
+      "physical": true
+    },
+    "bootstrap": {
+      "richardson": {
+        "mean": 0.05091421227995994,
+        "std": 0.009763452760688017,
+        "lo": 0.03233782541680616,
+        "hi": 0.06950109256846988,
+        "n": 500
+      },
+      "linear": {
+        "mean": 0.04650520534620122,
+        "std": 0.004869719666214567,
+        "lo": 0.03640270977390328,
+        "hi": 0.05565511857867813,
+        "n": 500
+      },
+      "exponential": {
+        "mean": 7.552944927335515,
+        "std": 15.457921041891126,
+        "lo": 0.03856797953089144,
+        "hi": 47.50909379608887,
+        "n": 500
+      }
+    }
+  },
+  "table": [
+    {
+      "condition": "raw (lambda=1)",
+      "p_correct": 0.049,
+      "tvd": 0.4725896937289025,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.049152,
+        "std": 0.003131368220741172,
+        "lo": 0.043495,
+        "hi": 0.05550499999999999,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "REM (simplex)",
+      "p_correct": 0.04464438339440327,
+      "tvd": 0.49108365356205336,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.044819191901285485,
+        "std": 0.004260130905625043,
+        "lo": 0.03718484867204762,
+        "hi": 0.05350317424715209,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "ZNE (linear)",
+      "p_correct": 0.05078333333333331,
+      "tvd": null,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.05067676666666665,
+        "std": 0.00358462579276391,
+        "lo": 0.04360374999999998,
+        "hi": 0.05778124999999997,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "ZNE+REM (linear)",
+      "p_correct": 0.04689603587010244,
+      "tvd": null,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.04650520534620122,
+        "std": 0.004869719666214567,
+        "lo": 0.03640270977390328,
+        "hi": 0.05565511857867813,
+        "n": 500
+      },
+      "valid": true
+    }
+  ],
+  "task_arns": {
+    "QPE lambda=5": "arn:aws:braket:us-west-1:767397707562:quantum-task/020e668b-6517-4be9-a3d5-5ebef374ecb5",
+    "QPE lambda=1": "arn:aws:braket:us-west-1:767397707562:quantum-task/19048dd5-0590-44e3-b328-a38476a5bf3a",
+    "readout calibration cal1": "arn:aws:braket:us-west-1:767397707562:quantum-task/bffa65ce-1faf-4f05-9aad-f980fa9df358",
+    "QPE lambda=3": "arn:aws:braket:us-west-1:767397707562:quantum-task/c4e02aac-0bfc-458a-9b5c-ae397727ad45",
+    "readout calibration cal0": "arn:aws:braket:us-west-1:767397707562:quantum-task/e4e13d71-e640-42c3-94d9-22a17bea770c"
+  }
+}

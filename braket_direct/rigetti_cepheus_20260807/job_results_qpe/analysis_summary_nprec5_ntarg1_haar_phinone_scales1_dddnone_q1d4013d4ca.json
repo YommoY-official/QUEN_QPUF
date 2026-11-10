@@ -1,0 +1,140 @@
+{
+  "generated": "2026-08-28T03:47:02",
+  "synthetic": false,
+  "run": {
+    "n_prec": 5,
+    "n_targ": 1,
+    "state_mode": "haar",
+    "phi": null,
+    "ideal_bin": 17,
+    "scales": [
+      1
+    ],
+    "shots_per_task": 10000
+  },
+  "qubits": {
+    "measured_qubits": [
+      2,
+      1,
+      3,
+      0,
+      4
+    ],
+    "clbit_to_phys": [
+      2,
+      1,
+      3,
+      0,
+      4
+    ],
+    "provenance": "logged"
+  },
+  "batches": {
+    "mode": "pooled",
+    "provenance": "logged batch_id",
+    "ids": [
+      "20260807T122648Z"
+    ],
+    "anchors": {
+      "20260807T122648Z": {
+        "scale": 1,
+        "shots": 10000,
+        "raw": 0.0347,
+        "rem": 0.03510890300722286
+      }
+    }
+  },
+  "ddd": {
+    "sequence": "none",
+    "arms_present": [
+      "none"
+    ],
+    "deltas": null
+  },
+  "rem": {
+    "method": "simplex",
+    "condition_number": 2.17094988659994,
+    "p_1_given_0": [
+      0.0785,
+      0.0557,
+      0.0439,
+      0.0198,
+      0.0228
+    ],
+    "p_0_given_1": [
+      0.08030000000000004,
+      0.1059,
+      0.08089999999999997,
+      0.05500000000000005,
+      0.124
+    ],
+    "bootstrap": {
+      "raw": {
+        "mean": 0.0346926,
+        "std": 0.001718391975645815,
+        "lo": 0.0315475,
+        "hi": 0.0379525,
+        "n": 500
+      },
+      "rem": {
+        "mean": 0.03510286556343635,
+        "std": 0.0025304193781870406,
+        "lo": 0.030426877222826165,
+        "hi": 0.03973488774697355,
+        "n": 500
+      },
+      "delta": {
+        "mean": 0.0004102655634363592,
+        "std": 0.0009280800209512313,
+        "lo": -0.0014914886322555105,
+        "hi": 0.0021753210880953487,
+        "n": 500
+      },
+      "condition_number": {
+        "mean": 2.170271766883353,
+        "std": 0.022325613804095965,
+        "lo": 2.1297377462363767,
+        "hi": 2.215796744164454,
+        "n": 500
+      }
+    }
+  },
+  "rem_skip_reason": null,
+  "zne": null,
+  "zne_rem": null,
+  "table": [
+    {
+      "condition": "raw (lambda=1)",
+      "p_correct": 0.0347,
+      "tvd": 0.7752123749803894,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.0346926,
+        "std": 0.001718391975645815,
+        "lo": 0.0315475,
+        "hi": 0.0379525,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "REM (simplex)",
+      "p_correct": 0.03510890300722286,
+      "tvd": 0.7833823895372398,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.03510286556343635,
+        "std": 0.0025304193781870406,
+        "lo": 0.030426877222826165,
+        "hi": 0.03973488774697355,
+        "n": 500
+      },
+      "valid": true
+    }
+  ],
+  "task_arns": {
+    "QPE lambda=1": "arn:aws:braket:us-west-1:767397707562:quantum-task/13a759f8-f9cc-4c5b-9e29-73c7f0fdc736",
+    "readout calibration cal1": "arn:aws:braket:us-west-1:767397707562:quantum-task/364ae749-4b75-4a2f-88af-fa802540b411",
+    "readout calibration cal0": "arn:aws:braket:us-west-1:767397707562:quantum-task/b1fbcbe8-eecb-4e17-8455-a427a0426d6d"
+  }
+}

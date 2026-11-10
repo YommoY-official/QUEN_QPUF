@@ -156,7 +156,8 @@ already gotten burned by, so treat them with the same weight.
 - **Negative results are deliverables.** A correct negative result is a
   deliverable, not a failure. Do not let any agent — human or Claude —
   reframe a null or disconfirming result as something more publishable
-  than it is.
+  than it is. The writer documents it with the same rigor as a positive
+  result.
 - **New sessions and open-ended research agents are gated; routine
   specialist delegation is not.** No session — Director, a worker, or any
   other — opens a new independent peer session, or launches an open-ended/
@@ -172,26 +173,31 @@ already gotten burned by, so treat them with the same weight.
 
 ## 3. Multi-agent structure
 
-This repo uses five Claude Code subagents, defined in `.claude/agents/`:
+This repo uses six Claude Code subagents, defined in `.claude/agents/`:
 
 | Agent | File | Role |
 |---|---|---|
-| Director | `director.md` | Owns the plan, decomposes tasks, delegates to the other four, synthesizes their output for Yon. Does not write physics or code itself. |
+| Director | `director.md` | Owns the plan, decomposes tasks, delegates to the other five, synthesizes their output for Yon. Does not write physics, code, or documentation itself. |
 | Physicist | `physicist.md` | Owns correctness of the quantum-mechanical content: protocol fidelity to Ghosh et al., noise-model reasoning, what an observable *should* look like. |
 | Coder | `coder.md` | Owns implementation: circuit construction, Qiskit/Braket integration, data pipelines, plotting. |
 | Verifier | `verifier.md` | Owns adversarial checking: simulator cross-checks, known-answer tests, statistical sanity checks, regression checks against prior known bugs. |
 | AWS Agent | `aws-agent.md` | Owns AWS Braket connectivity, the DCV remote desktop environment, credentials/session issues, `run_batch` submission mechanics, S3 result retrieval. |
+| Writer | `writer.md` | Owns prose and LaTeX: docs, README, results write-ups, and the paper draft. Only agent that edits `.md`/`.tex` files — the Director delegates all documentation and writing tasks here rather than doing them itself. |
 
 Default flow for any nontrivial task: **Director** breaks the task down →
 **Physicist** specifies the expected behavior/observable →
 **Coder** implements → **Verifier** checks →
 **AWS Agent** handles anything that touches real hardware or the remote
-desktop → **Director** reports back to Yon with what changed and what was
-verified. Not every task needs all five; the Director decides scope.
+desktop → **Writer** writes up the result, including negative results →
+**Director** reports back to Yon with what changed and what was verified.
+Not every task needs all six; the Director decides scope.
 
 Subagents should stay in their lane. If the Coder notices a physics
 assumption looks wrong, it flags it to the Director for the Physicist to
 resolve — it does not silently change the physics to make code cleaner.
+Likewise, the Writer represents conclusions the Physicist and Verifier have
+already reached — it does not independently judge whether a result is
+correct or ready to publish.
 
 ## 4. Repository conventions
 

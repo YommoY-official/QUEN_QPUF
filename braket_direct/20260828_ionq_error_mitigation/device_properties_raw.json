@@ -1,0 +1,54 @@
+{
+  "_note": "Fetched live from AWS Braket by the DCV Worker session, 2026-08-28, and relayed here. The 'connectivityGraph' key under paradigm.connectivity was omitted in transit for brevity -- it is fullyConnected:true expanded per-qubit (all 36 qubits list all 35 others). The literal expansion is on the DCV box at the same path if it is ever needed.",
+  "service": {
+    "braketSchemaHeader": {"name": "braket.device_schema.device_service_properties", "version": "1"},
+    "shotsRange": [100, 5000],
+    "deviceCost": {"price": 0.08, "unit": "shot"},
+    "deviceLocation": "Basel, Switzerland",
+    "updatedAt": "2026-08-27T00:00:00+00:00"
+  },
+  "action": {
+    "braket.ir.openqasm.program": {
+      "supportedOperations": ["x","y","z","h","s","si","t","ti","v","vi","rx","ry","rz","cnot","swap","xx","yy","zz"],
+      "supportedModifiers": [],
+      "supportedPragmas": ["braket_result_type_sample","braket_result_type_expectation","braket_result_type_variance","braket_result_type_probability","verbatim"],
+      "forbiddenPragmas": ["braket_unitary_matrix","braket_result_type_state_vector","braket_result_type_density_matrix","braket_result_type_amplitude","braket_result_type_adjoint_gradient"],
+      "maximumQubitArrays": 1,
+      "maximumClassicalArrays": 1,
+      "forbiddenArrayOperations": ["concatenation","negativeIndex","range","rangeWithStep","slicing","selection"],
+      "requiresAllQubitsMeasurement": false,
+      "supportPhysicalQubits": true,
+      "requiresContiguousQubitIndices": false,
+      "supportsPartialVerbatimBox": false,
+      "supportsUnassignedMeasurements": true,
+      "disabledQubitRewiringSupported": false,
+      "supportedResultTypes": [
+        {"name": "Sample", "observables": ["x","y","z","h","i"], "minShots": 100, "maxShots": 5000},
+        {"name": "Expectation", "observables": ["x","y","z","h","i"], "minShots": 100, "maxShots": 5000},
+        {"name": "Variance", "observables": ["x","y","z","h","i"], "minShots": 100, "maxShots": 5000},
+        {"name": "Probability", "observables": null, "minShots": 100, "maxShots": 5000}
+      ]
+    }
+  },
+  "paradigm": {
+    "connectivity": {"fullyConnected": true},
+    "qubitCount": 36,
+    "nativeGateSet": ["GPI", "GPI2", "ZZ"]
+  },
+  "provider": {
+    "fidelity": {"1Q": {"mean": 0.9998}, "2Q": {"mean": 0.9882}, "spam": {"mean": 0.994}},
+    "timing": {"T1": 188.0, "T2": 0.95, "1Q": 6.3e-05, "2Q": 0.00065, "readout": 0.00025, "reset": 0.00015},
+    "errorMitigation": {"braket.device_schema.error_mitigation.debias.Debias": {"minimumShots": 2500}}
+  },
+  "standardized": {
+    "T1": {"value": 188.0, "unit": "s"},
+    "T2": {"value": 0.95, "unit": "s"},
+    "readoutFidelity": [{"fidelityType": {"name": "RANDOMIZED_BENCHMARKING"}, "fidelity": 0.994, "unit": "fraction"}],
+    "readoutDuration": {"value": 0.00025, "unit": "s"},
+    "singleQubitGateDuration": {"value": 6.3e-05, "unit": "s"},
+    "singleQubitFidelity": [{"fidelityType": {"name": "RANDOMIZED_BENCHMARKING"}, "fidelity": 0.9998, "unit": "fraction"}],
+    "twoQubitGateFidelity": [{"fidelityType": {"name": "RANDOMIZED_BENCHMARKING"}, "fidelity": 0.9882, "unit": "fraction"}],
+    "twoQubitGateDuration": {"value": 0.00065, "unit": "s"},
+    "activeResetDuration": {"value": 0.00015, "unit": "s"}
+  }
+}

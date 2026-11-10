@@ -1,0 +1,266 @@
+{
+  "generated": "2026-08-28T03:46:54",
+  "synthetic": false,
+  "run": {
+    "n_prec": 4,
+    "n_targ": 2,
+    "state_mode": "haar",
+    "phi": null,
+    "ideal_bin": 4,
+    "scales": [
+      1,
+      3,
+      5
+    ],
+    "shots_per_task": 10000
+  },
+  "qubits": {
+    "measured_qubits": [
+      67,
+      66,
+      68,
+      65
+    ],
+    "clbit_to_phys": [
+      67,
+      66,
+      68,
+      65
+    ],
+    "provenance": "logged"
+  },
+  "batches": {
+    "mode": "pooled",
+    "provenance": "logged batch_id",
+    "ids": [
+      "20260807T124328Z"
+    ],
+    "anchors": {
+      "20260807T124328Z": {
+        "scale": 1,
+        "shots": 10000,
+        "raw": 0.0341,
+        "rem": 0.03227156503895171
+      }
+    }
+  },
+  "ddd": {
+    "sequence": "none",
+    "arms_present": [
+      "none"
+    ],
+    "deltas": null
+  },
+  "rem": {
+    "method": "simplex",
+    "condition_number": 1.3948003445759818,
+    "p_1_given_0": [
+      0.0471,
+      0.0154,
+      0.0541,
+      0.0171
+    ],
+    "p_0_given_1": [
+      0.06010000000000004,
+      0.047599999999999976,
+      0.03759999999999997,
+      0.028200000000000003
+    ],
+    "bootstrap": {
+      "raw": {
+        "mean": 0.0340434,
+        "std": 0.0018350452916603692,
+        "lo": 0.0303475,
+        "hi": 0.0376525,
+        "n": 500
+      },
+      "rem": {
+        "mean": 0.032199782702727234,
+        "std": 0.002221215072512988,
+        "lo": 0.0277855861018544,
+        "hi": 0.03640215516747376,
+        "n": 500
+      },
+      "delta": {
+        "mean": -0.0018436172972727649,
+        "std": 0.0004827682841752773,
+        "lo": -0.002871470007262504,
+        "hi": -0.0009544382373926274,
+        "n": 500
+      },
+      "condition_number": {
+        "mean": 1.3954770848325833,
+        "std": 0.008868870439828747,
+        "lo": 1.3784838185510544,
+        "hi": 1.413237321604323,
+        "n": 500
+      }
+    }
+  },
+  "rem_skip_reason": null,
+  "zne": {
+    "fit": {
+      "richardson": 0.03728750000000001,
+      "linear": 0.03372499999999999,
+      "linear_slope": -0.000375000000000001,
+      "exponential": 3.960544721877125,
+      "exponential_params": [
+        0.031850000005024026,
+        3.928694721872101,
+        7.465162564079192
+      ],
+      "model_spread": 3.926819721877125,
+      "unphysical": [
+        "exponential"
+      ],
+      "physical": false
+    },
+    "bootstrap": {
+      "point_estimate": {
+        "richardson": 0.03728750000000001,
+        "linear": 0.03372499999999999,
+        "linear_slope": -0.000375000000000001,
+        "exponential": 3.960544721877125,
+        "exponential_params": [
+          0.031850000005024026,
+          3.928694721872101,
+          7.465162564079192
+        ],
+        "model_spread": 3.926819721877125,
+        "unphysical": [
+          "exponential"
+        ],
+        "physical": false
+      },
+      "ci": {
+        "richardson": {
+          "mean": 0.037143,
+          "std": 0.004190733138542342,
+          "lo": 0.029189062499999998,
+          "hi": 0.04491499999999999,
+          "n": 500
+        },
+        "linear": {
+          "mean": 0.03379393333333332,
+          "std": 0.0022154303602551035,
+          "lo": 0.029718958333333333,
+          "hi": 0.03829999999999999,
+          "n": 500
+        },
+        "exponential": {
+          "mean": 2.886714634272516,
+          "std": 4.355788072251258,
+          "lo": 0.029668305287955027,
+          "hi": 13.157662857714222,
+          "n": 497
+        }
+      }
+    }
+  },
+  "zne_rem": {
+    "fit": {
+      "richardson": 0.035569725729595505,
+      "linear": 0.03164120466237159,
+      "linear_slope": -0.00019669669020387363,
+      "exponential": 2.848938212607634,
+      "exponential_params": [
+        0.030440889651497202,
+        2.8184973229561368,
+        7.339290847078623
+      ],
+      "model_spread": 2.8172970079452626,
+      "unphysical": [
+        "exponential"
+      ],
+      "physical": false
+    },
+    "bootstrap": {
+      "richardson": {
+        "mean": 0.03565778895941098,
+        "std": 0.00476630221812005,
+        "lo": 0.02687657228696651,
+        "hi": 0.045469449915147245,
+        "n": 500
+      },
+      "linear": {
+        "mean": 0.031824200275293014,
+        "std": 0.002707062464863704,
+        "lo": 0.026424744690911012,
+        "hi": 0.03709422230234744,
+        "n": 500
+      },
+      "exponential": {
+        "mean": 3.143105896936859,
+        "std": 4.891969128690312,
+        "lo": 0.002433565233216431,
+        "hi": 16.09205351933059,
+        "n": 500
+      }
+    }
+  },
+  "table": [
+    {
+      "condition": "raw (lambda=1)",
+      "p_correct": 0.0341,
+      "tvd": 0.4918110555506304,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.0340434,
+        "std": 0.0018350452916603692,
+        "lo": 0.0303475,
+        "hi": 0.0376525,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "REM (simplex)",
+      "p_correct": 0.03227156503895171,
+      "tvd": 0.49697882266586313,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.032199782702727234,
+        "std": 0.002221215072512988,
+        "lo": 0.0277855861018544,
+        "hi": 0.03640215516747376,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "ZNE (linear)",
+      "p_correct": 0.03372499999999999,
+      "tvd": null,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.03379393333333332,
+        "std": 0.0022154303602551035,
+        "lo": 0.029718958333333333,
+        "hi": 0.03829999999999999,
+        "n": 500
+      },
+      "valid": true
+    },
+    {
+      "condition": "ZNE+REM (linear)",
+      "p_correct": 0.03164120466237159,
+      "tvd": null,
+      "phase_err": null,
+      "ci": {
+        "mean": 0.031824200275293014,
+        "std": 0.002707062464863704,
+        "lo": 0.026424744690911012,
+        "hi": 0.03709422230234744,
+        "n": 500
+      },
+      "valid": true
+    }
+  ],
+  "task_arns": {
+    "readout calibration cal0": "arn:aws:braket:us-west-1:767397707562:quantum-task/1c7f1c59-8526-4ecc-a814-b26dc6e3b52b",
+    "readout calibration cal1": "arn:aws:braket:us-west-1:767397707562:quantum-task/a48175b4-c549-493f-ac9e-fa6a934d40b1",
+    "QPE lambda=5": "arn:aws:braket:us-west-1:767397707562:quantum-task/b133cb1a-cca9-4e08-ac57-84e355b7536e",
+    "QPE lambda=1": "arn:aws:braket:us-west-1:767397707562:quantum-task/d3d219a9-b631-4b11-aa56-83ce23eefb94",
+    "QPE lambda=3": "arn:aws:braket:us-west-1:767397707562:quantum-task/e024308b-c2ae-4129-9f4a-18758ccb0dd8"
+  }
+}

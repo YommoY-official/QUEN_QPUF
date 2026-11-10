@@ -27,15 +27,19 @@ Why this differs from rigetti_qpuf_common.py
    following the pattern already verified working in
    noise_mitigation/ionq_noise_mitig.py.
 
-3. VERBATIM STATUS IS UNCONFIRMED HERE (open question, not a device fact).
-   The Rigetti campaign could assert "verbatim is mandatory" as a device
-   fact because device_caps.json for Cepheus was actually fetched and
-   records supportsPartialVerbatimBox: true. No IonQ equivalent has ever
-   been fetched in this repository -- see MITIGATION_BRIEF_IONQ.md Section 9
-   (Open questions), which is BLOCKING for any ZNE/DDD number taken on real
-   hardware under this campaign. `to_braket_qasm` below still offers a
-   verbatim path for when that question is settled, but nothing here
-   defaults to using it or claims it is required or unnecessary.
+3. VERBATIM STATUS -- NOW A CONFIRMED DEVICE FACT (was open, resolved
+   2026-08-28).
+   device_caps.json / device_properties_raw.json in this directory were
+   fetched live from AwsDevice(DEVICE_ARN) on the DCV box and saved here:
+   supportsPartialVerbatimBox=False, plain `verbatim` IS in
+   supportedPragmas -- so it's whole-circuit-box-or-nothing, no partial
+   wrapping. That resolves what MITIGATION_BRIEF_IONQ.md Section 9.1 used
+   to call blocking. `to_braket_qasm(verbatim=True)` below already produces
+   exactly that shape. NOTE this only tells you the box is accepted, not
+   that our submitted rz/rx/rxx gates are the literal pulses executed --
+   nativeGateSet is GPI/GPI2/ZZ, so a basis translation happens server-side
+   even under verbatim; verbatim suppresses optimization/rewriting, not
+   basis translation.
 
 4. GATE-COUNT-BASED RUNTIME MODEL, NOT DEPTH-BASED.
    On a trapped-ion chain gates are serialized (no same-cycle parallel
@@ -45,16 +49,21 @@ Why this differs from rigetti_qpuf_common.py
    braket_direct/ionq_20260601/submit_QPUF_ntarg.py, not
    rigetti_qpuf_common.py's serial/parallel split.
 
-5. TIMING CONSTANTS AND FIDELITIES ARE UNVALIDATED ESTIMATES, NOT
-   CALIBRATION-DERIVED VALUES.
-   Correcting a phrasing that has circulated: ONE_QUBIT_TIME_S,
-   TWO_QUBIT_TIME_S, READOUT_TIME_S, STARTUP_TIME_S, F1Q and F2Q below are
-   copied verbatim from noise_mitigation/ionq_noise_mitig.py, whose own
-   comments say they were never fetched from a calibration and are used
-   ONLY for cost/wall-clock estimation. See MITIGATION_BRIEF_IONQ.md
-   Section 9.2 for the full provenance discussion, including a specific
+5. TIMING CONSTANTS AND FIDELITIES ARE NOW CALIBRATION-DERIVED (was
+   unvalidated placeholders copied from noise_mitigation/ionq_noise_mitig.py;
+   resolved 2026-08-28).
+   ONE_QUBIT_TIME_S, TWO_QUBIT_TIME_S, READOUT_TIME_S, F1Q, F2Q and
+   SPAM_FIDELITY below are read off device_properties_raw.json's
+   provider.timing / provider.fidelity, fetched live from the device on the
+   DCV box -- not guesses anymore. STARTUP_TIME_S remains an unfetched
+   placeholder (no corresponding field in the caps dump). The previously
    documented CONTRADICTION with the Rigetti model over how `rz` should be
-   timed -- resolved here as RZ_TIME_S in error_mitig_ionq.py, not silently.
+   timed (RZ_TIME_S in error_mitig_ionq.py) is a modeling-convention
+   question, not a numeric one, and is UNCHANGED by this update -- see
+   MITIGATION_BRIEF_IONQ.md Section 9.2. Per-gate durations being real now
+   does NOT make the wall-clock estimate in estimate_runtime_s() validated:
+   no submitted task's actual qpu_time_seconds has been compared against
+   this model's prediction yet.
 """
 
 import json
@@ -81,26 +90,77 @@ DEVICE_ARN  = "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1"
 IONQ_BASIS = ["rz", "rx", "rxx", "measure"]
 
 # -- GATE-TIME MODEL AND FIDELITIES -----------------------------------------
-# Copied from noise_mitigation/ionq_noise_mitig.py. NOT calibration-derived
-# -- see module docstring point 5 and MITIGATION_BRIEF_IONQ.md Section 9.2.
-ONE_QUBIT_TIME_S = 130e-6
-TWO_QUBIT_TIME_S = 970e-6
-READOUT_TIME_S   = 150e-6 + 50e-6
+# CALIBRATION-DERIVED as of 2026-08-28: fetched live from AwsDevice(DEVICE_ARN)
+# on the DCV box and saved to device_properties_raw.json (provider.timing /
+# provider.fidelity) in this directory. These replace the
+# noise_mitigation/ionq_noise_mitig.py placeholders this file used to copy --
+# per-gate durations and F1Q/F2Q are now real numbers, not guesses. NOTE:
+# `qpu_time_seconds` predicted from them (estimate_runtime_s below) has still
+# never been checked against an actual completed task's billed runtime, so
+# the WALL-CLOCK estimate remains unvalidated even though its per-gate inputs
+# are not -- see MITIGATION_BRIEF_IONQ.md Section 9.2.
+ONE_QUBIT_TIME_S = 6.3e-05
+TWO_QUBIT_TIME_S = 0.00065
+READOUT_TIME_S   = 0.00025
 STARTUP_TIME_S   = 0.5
 
-# F = (F2Q)**n_2q * (F1Q)**n_1q -- IonQ Forte typical; TUNE to your
-# calibration (ionq_noise_mitig.py's own comment). Unvalidated against
-# hardware -- see MITIGATION_BRIEF_IONQ.md Section 9.2.
-F2Q = 0.985
+# F = (F2Q)**n_2q * (F1Q)**n_1q -- device_properties_raw.json
+# provider.fidelity.{1Q,2Q}.mean, randomized-benchmarking, fetched 2026-08-28.
+F2Q = 0.9882
 F1Q = 0.9998
+
+# SPAM (state-prep-and-measure / readout) fidelity, provider.fidelity.spam.mean
+# -- i.e. ~0.6% readout error per qubit. This is the quantity REM's confusion
+# matrix is actually correcting; kept here as a named constant for the noisy-
+# simulation validation harness (mitig_analysis.build_noise_model's
+# `p_readout` default) rather than left as an unsourced guess.
+SPAM_FIDELITY = 0.994
+
+# Device-enforced (service.shotsRange in device_properties_raw.json, fetched
+# 2026-08-28) -- unlike MAX_TOTAL_GATES below, this IS a cited platform
+# limit: a task outside this range is rejected by Braket, not merely
+# expensive. Debias (provider.errorMitigation...minimumShots) additionally
+# requires >= 2500 shots, tighter than the device floor.
+SHOTS_RANGE = (100, 5000)
+DEBIAS_MIN_SHOTS = 2500
 
 # Hard cap on (gates per circuit) * shots. THIS IS A SELF-IMPOSED BUDGET
 # GUESS FOR THIS PROJECT, NOT A CITED AWS OR IONQ PLATFORM LIMIT -- do not
 # read it as an authoritative device ceiling (CLAUDE.md: "ground truth beats
-# prior claims"). It exists only to keep an accidental huge sweep from
-# quietly costing far more than intended; if AWS/IonQ publish a real limit,
-# replace this with a citation.
-MAX_TOTAL_GATES = 1_000_000
+# prior claims"). Sized to cover the largest planned family (D2: n_prec=4,
+# n_targ=3, haar -- 2,592,000 gate*shots at 2000 shots/task) with ~54%
+# headroom; revisit if a ZNE ladder is ever added to a high-n_targ family
+# (D2 at lambda=3 alone would be ~7.8M). If AWS/IonQ publish a real limit,
+# replace this with a citation instead of a budget guess.
+MAX_TOTAL_GATES = 4_000_000
+
+# Hard cap on gates PER CIRCUIT. UNLIKE MAX_TOTAL_GATES ABOVE, THIS IS A
+# REAL, EMPIRICALLY CONFIRMED AWS/IONQ PLATFORM LIMIT, not a project budget
+# guess -- do not conflate the two, confusing them is exactly the bug this
+# constant exists to prevent. Confirmed by real submissions to
+# Forte-Enterprise-1 on 2026-08-30: a probe circuit at 2,583 native gates
+# was rejected at CreateQuantumTask validation with the verbatim error
+#     "The total number of gates in the circuit is too high. Please ensure
+#      that the number of gates does not exceed 2,000. It is currently
+#      2,583."
+# while a 1,915-gate probe was accepted and a 3,231-gate probe was also
+# rejected (see braket_direct/ionq_20260601/probe_gate_limit.py). The
+# counted quantity is exactly count_native(qc)["n_gates"] == n_1q + n_2q
+# (measurements are NOT counted) -- verified by matching AWS's reported
+# count to this repo's own count_native() on all three probe circuits.
+# This limit is PER-CIRCUIT and SHOT-INDEPENDENT: it has nothing to do with
+# N_SHOTS or SHOTS_RANGE above. AWS's own published documentation reportedly
+# states 5,000; the real, observed-at-the-service ceiling is 2,000 --
+# ground truth (CreateQuantumTask's actual rejection) beats the doc
+# (CLAUDE.md: "ground truth beats prior claims -- including documentation").
+#
+# FORWARD-LOOKING WARNING: C2 and D2 can never take a full ZNE ladder under
+# this limit. C2 (n_prec=5, n_targ=2) is 934 gates at lambda=1 but 2,802 at
+# lambda=3; D2 (n_prec=4, n_targ=3, the tightest family at 1,296 gates,
+# lambda=1) crosses 2,000 by roughly lambda=1.5 (1,944 gates) and is 3,888
+# at lambda=3. Anyone later adding a ZNE ladder to a high-n_targ family
+# will hit this DEVICE limit, not the MAX_TOTAL_GATES budget above.
+MAX_GATES_PER_CIRCUIT = 2_000
 
 CONN_CACHE = os.path.join(os.path.dirname(__file__), "device_caps.json")
 
@@ -295,6 +355,30 @@ def count_native(qc_hw: QuantumCircuit) -> dict:
     }
 
 
+def assert_gate_count_ok(qc_hw: QuantumCircuit, label: str = "") -> None:
+    """
+    Raise if `qc_hw` exceeds MAX_GATES_PER_CIRCUIT, the real per-circuit
+    AWS/IonQ CreateQuantumTask limit (see that constant's comment). This is
+    NOT the same check as MAX_TOTAL_GATES: that one is a shot-scaled project
+    budget guess, this one is the device's actual per-circuit rejection
+    threshold and does not depend on N_SHOTS at all. Call once per submitted
+    circuit -- including every ZNE fold scale, since folding is exactly
+    what pushes a circuit over the limit.
+    """
+    n_gates = count_native(qc_hw)["n_gates"]
+    if n_gates > MAX_GATES_PER_CIRCUIT:
+        where = f" '{label}'" if label else ""
+        raise ValueError(
+            f"circuit{where} has {n_gates:,} native gates (n_1q+n_2q), "
+            f"exceeding the AWS/IonQ device limit of "
+            f"{MAX_GATES_PER_CIRCUIT:,} gates/circuit "
+            f"(ionq_mitigation_common.MAX_GATES_PER_CIRCUIT -- an "
+            f"empirically confirmed CreateQuantumTask rejection threshold, "
+            f"NOT the MAX_TOTAL_GATES project budget). Reduce N_PREC, "
+            f"N_TARG, or the ZNE fold scale for this circuit."
+        )
+
+
 def measured_physical_qubits(qc_hw: QuantumCircuit) -> list[int]:
     """
     Qubit index feeding each clbit, ordered by clbit index. Needed because
@@ -345,7 +429,8 @@ def print_circuit_report(title: str, profile: dict, n_shots: int,
     print(f"  physical qubits touched            : {profile['n_qubits_used']}")
     print(f"  1-qubit gates (rz + rx)            : {profile['n_1q']:,}")
     print(f"  2-qubit gates (rxx)                : {profile['n_2q']:,}")
-    print(f"  total gates                        : {profile['n_gates']:,}")
+    print(f"  total gates                        : {profile['n_gates']:,}"
+          f"  [device cap {MAX_GATES_PER_CIRCUIT:,}]")
     print(f"  measurements                       : {profile['n_meas']}")
     print(f"  shots                              : {n_shots:,}")
     print(f"  total gates * shots                : {total_gates:,}  [cap {MAX_TOTAL_GATES:,}]")
@@ -398,17 +483,24 @@ def to_braket_qasm(qc_hw: QuantumCircuit, verbatim: bool = False,
     (see _rewrite_qasm_for_braket).
 
     verbatim=True wraps the gate body in
-    `#pragma braket verbatim / box { ... }`. UNLIKE rigetti_qpuf_common.py's
-    identically-named function, this is NOT known to be required OR safe
-    here: whether IonQ Forte-Enterprise-1 supports partial verbatim boxes,
-    and whether that composes with EnableExperimentalCapability() (needed
-    elsewhere in this repo for MCM+reset) or with the flat single
-    QuantumRegister export CLAUDE.md's known-bug item 3 requires, is
-    UNRESOLVED -- see MITIGATION_BRIEF_IONQ.md Section 9.1. Do not flip this
-    on for a real hardware submission without reading that section first.
-    Default is False: submit as-is and rely on the compiled-vs-submitted gate
-    count check (Section 9.1, "what would settle it", item 1-2) to find out
-    whether the server-side compiler preserved the circuit.
+    `#pragma braket verbatim / box { ... }`. RESOLVED 2026-08-28 (was
+    UNRESOLVED -- see MITIGATION_BRIEF_IONQ.md Section 9.1 for the prior
+    open-question framing, now stale): device_caps.json /
+    device_properties_raw.json, fetched live from Forte-Enterprise-1, show
+    supportsPartialVerbatimBox=False with plain `verbatim` present in
+    supportedPragmas -- so it is whole-circuit-box-or-nothing, no partial
+    wrapping, which is exactly the shape this function already produces when
+    verbatim=True (there is no partial-box code path here to be wrong about).
+    Also confirmed: maximumQubitArrays=1 in the same caps dump, i.e. CLAUDE.md
+    known-bug item 3 (single flat QuantumRegister, no separate named
+    registers) is now a device-confirmed requirement, not repo lore.
+
+    Caution this does NOT resolve: nativeGateSet is GPI/GPI2/ZZ while
+    supportedOperations is the rz/rx/xx-level list this function emits, so a
+    basis translation happens server-side even inside a verbatim box --
+    verbatim suppresses optimization/rewriting of the gates we submit, it
+    does not mean those gates ARE the physical pulses executed. Do not claim
+    otherwise in analysis of hardware results.
     """
     import re
     from qiskit import qasm3
@@ -451,6 +543,49 @@ def to_braket_qasm(qc_hw: QuantumCircuit, verbatim: bool = False,
         out += gates
     out += measures
     return "\n".join(out) + "\n"
+
+
+# device_caps.json supportedOperations, fetched live 2026-08-28 (this
+# directory's device_caps.json / device_properties_raw.json). Note there is
+# NO `rxx` here -- only bare `xx` -- and no `i` (identity). Under verbatim
+# there is no server-side gate translation, so anything off this list fails
+# the task outright rather than being silently recompiled; see
+# assert_supported_gates below. The `i` gap matters the moment DDD is added
+# to this campaign: error_mitig_ionq.py's DDD null control ("II") emits
+# `circ.id(qubit)`, which is NOT in this list and will break under verbatim
+# -- flagged there, not fixed here (no DDD arm in this campaign yet).
+IONQ_SUPPORTED_OPS = frozenset([
+    "x", "y", "z", "h", "s", "si", "t", "ti", "v", "vi",
+    "rx", "ry", "rz", "cnot", "swap", "xx", "yy", "zz",
+])
+
+
+def assert_supported_gates(qasm_src: str) -> None:
+    """
+    Pre-submission guard: every gate token actually emitted in `qasm_src`
+    must be in IONQ_SUPPORTED_OPS. Catches an illegal gate locally, before it
+    ever costs a task -- verbatim submission gives no server-side rewriting
+    to fall back on, so a gate off this list is a hard failure on the
+    device, not a silent recompile.
+    """
+    import re
+    bad = set()
+    for raw in qasm_src.splitlines():
+        line = raw.strip()
+        if not line or line.startswith((
+                "OPENQASM", "include", "bit", "qubit", "#pragma", "box", "}")):
+            continue
+        if "measure" in line:
+            continue
+        m = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\s*[\(\s]", line)
+        if m and m.group(1) not in IONQ_SUPPORTED_OPS:
+            bad.add(m.group(1))
+    if bad:
+        raise ValueError(
+            f"QASM contains gate(s) not in Forte-Enterprise-1's "
+            f"supportedOperations (device_caps.json): {sorted(bad)}. Under "
+            f"verbatim these are NOT server-side translated and would fail "
+            f"the task outright, not be silently recompiled.")
 
 
 # -- Device capabilities ---------------------------------------------------------

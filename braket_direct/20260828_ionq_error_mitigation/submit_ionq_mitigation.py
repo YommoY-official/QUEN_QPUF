@@ -53,11 +53,12 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ionq_mitigation_common import (
-    DEVICE_NAME, DEVICE_ARN, IONQ_BASIS, MAX_TOTAL_GATES,
+    DEVICE_NAME, DEVICE_ARN, IONQ_BASIS, MAX_TOTAL_GATES, SHOTS_RANGE,
+    assert_gate_count_ok,
     haar_random_unitary, known_phase_unitary,
     build_qpe_circuit, ideal_qpe_distribution,
     load_device_caps, transpile_for_ionq, count_native,
-    measured_physical_qubits, to_braket_qasm,
+    measured_physical_qubits, to_braket_qasm, assert_supported_gates,
     append_job_log, encode_unitary, task_tags, confirm_submit,
     estimate_fidelity, fmt_time, print_circuit_report,
 )
@@ -341,6 +342,18 @@ def main():
     print(f"CIRCUIT SPECIFICS -- {len(jobs)} task(s) will be submitted")
     print("=" * 78)
 
+    # N_SHOTS is a real device limit (service.shotsRange in
+    # device_properties_raw.json, fetched 2026-08-28), unlike MAX_TOTAL_GATES
+    # below -- a task outside this range is rejected by Braket itself, not
+    # merely expensive. Check once here, not per-job, since N_SHOTS is the
+    # same for every task in this batch.
+    if not (SHOTS_RANGE[0] <= N_SHOTS <= SHOTS_RANGE[1]):
+        print(f"\nERROR (device shot range): N_SHOTS={N_SHOTS} is outside "
+              f"the device's allowed shots range {SHOTS_RANGE} "
+              f"(device_caps.json shotsRange -- a real platform limit, not "
+              f"a project guess). Choose a shot count in that range.")
+        sys.exit(1)
+
     total_runtime = 0.0
     total_gates   = 0
     for job in jobs:
@@ -350,10 +363,27 @@ def main():
         job["runtime_s"] = rt["runtime_s"]
         total_runtime += rt["runtime_s"]
         total_gates   += rt["total_gates"]
+
+        # Real AWS/IonQ device limit (2,000 native gates/circuit,
+        # empirically confirmed 2026-08-30 -- see
+        # ionq_mitigation_common.MAX_GATES_PER_CIRCUIT). This is checked
+        # PER CIRCUIT -- including every ZNE fold scale, since folding is
+        # exactly what pushes a circuit's gate count up -- and is entirely
+        # separate from the MAX_TOTAL_GATES budget check just below: that
+        # one is a self-imposed gates*shots cost guess, this one is what
+        # CreateQuantumTask actually rejects a task for, regardless of
+        # N_SHOTS.
+        try:
+            assert_gate_count_ok(job["circuit"], label=job["label"])
+        except ValueError as e:
+            print(f"\nERROR (device gate limit): {e}")
+            sys.exit(1)
+
         if rt["total_gates"] > MAX_TOTAL_GATES:
-            print(f"\nERROR: task '{job['label']}' has {rt['total_gates']:,} "
-                  f"total gates, over the self-imposed cap {MAX_TOTAL_GATES:,} "
-                  f"(see ionq_mitigation_common.MAX_TOTAL_GATES -- this cap is "
+            print(f"\nERROR (project budget): task '{job['label']}' has "
+                  f"{rt['total_gates']:,} total gates, over the self-imposed "
+                  f"cap {MAX_TOTAL_GATES:,} (see "
+                  f"ionq_mitigation_common.MAX_TOTAL_GATES -- this cap is "
                   f"a project budget guess, not a cited AWS/IonQ platform "
                   f"limit). Reduce N_PREC, N_SHOTS, or the ZNE scale.")
             sys.exit(1)
@@ -369,8 +399,11 @@ def main():
     print()
     print("  This is an ON-DEMAND submission -- each task is billed per task,")
     print("  and on-demand tasks may queue behind other users' work (unlike a")
-    print("  reserved window). Timing constants above are UNVALIDATED estimates")
-    print("  (MITIGATION_BRIEF_IONQ.md Section 9.2), not a calibration fit.")
+    print("  reserved window). Per-gate timing/fidelity constants above are")
+    print("  calibration-derived (device_properties_raw.json, fetched 2026-08-28),")
+    print("  but the resulting wall-clock ESTIMATE has never been checked against")
+    print("  an actual task's qpu_time_seconds -- treat runtime, not fidelity, as")
+    print("  the still-unvalidated number here (MITIGATION_BRIEF_IONQ.md Sec 9.2).")
 
     if not confirm_submit(
             f"Submit {len(jobs)} task(s) to {DEVICE_NAME}? [y/N]: ", ASSUME_YES):
@@ -397,9 +430,18 @@ def main():
     submitted = []
     log_file  = os.path.join(RESULTS_DIR, "job_log.txt")
     for job in jobs:
-        # verbatim=False by default: see to_braket_qasm's docstring for why
-        # this campaign does not default to a verbatim box (Section 9.1).
-        qasm_src = to_braket_qasm(job["circuit"], verbatim=False)
+        # Full-circuit verbatim: device_caps.json confirms
+        # supportsPartialVerbatimBox=False with plain `verbatim` in
+        # supportedPragmas, so whole-circuit-box is the only shape on offer
+        # and is exactly what to_braket_qasm(verbatim=True) produces -- see
+        # its docstring (resolved 2026-08-28; was Section 9.1's open
+        # question). Approved by Yon for this campaign.
+        qasm_src = to_braket_qasm(job["circuit"], verbatim=True)
+        # Local guard before this ever reaches the device: under verbatim
+        # there is no server-side gate translation for anything off
+        # supportedOperations, so an illegal gate is a hard task failure,
+        # not a silent recompile. Catch it here instead.
+        assert_supported_gates(qasm_src)
         print(f"\nSubmitting: {job['label']} ({N_SHOTS} shots) ...")
         task = device.run(
             OpenQasmProgram(source=qasm_src), shots=N_SHOTS,
@@ -427,7 +469,7 @@ def main():
             "ddd_sequence":      DDD_SEQ,
             "ddd_report":        ddd_report,
             "batch_id":          batch_id,
-            "verbatim":          False,
+            "verbatim":          True,
             "n_stages":          1,
             "state_mode":        STATE_MODE,
             "phi":               PHI if STATE_MODE == "known" else None,

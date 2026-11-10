@@ -11,7 +11,7 @@ Braket OpenQASM 3). Stage 2 uses a fresh precision-ancilla block because
 Forte-Enterprise-1 does NOT expose `reset` via its OpenQASM submission
 path (verified against `device.properties.action.supportedOperations`):
 
-    target[n_targ]    : Haar-random initial state (one RY+RZ per target qubit)
+    target[n_targ]    : random product state, one RY+RZ per qubit
     prec_a[n_prec]    : QPE ancillae for stage 1
     prec_b[n_prec]    : QPE ancillae for stage 2 (disjoint from prec_a)
 
@@ -54,6 +54,7 @@ STARTUP_TIME_S   = 0.5              # fixed per-task overhead
 import json
 import os
 import sys
+import warnings
 from datetime import datetime, timezone
 
 import numpy as np
@@ -84,6 +85,250 @@ def haar_random_unitary(d: int, rng: np.random.Generator | None = None) -> np.nd
     diag_R = np.diag(R)
     Lambda = diag_R / np.abs(diag_R)
     return Q * Lambda  # broadcast: multiplies each column of Q by Lambda[j]
+
+
+def _resolve_ks(n_targ: int, n_prec: int,
+                rng: np.random.Generator | None,
+                ks: tuple[int, ...] | None) -> tuple[int, ...]:
+    """
+    Shared ks validation/draw logic for on_grid_unitary and
+    product_rotated_on_grid_unitary (factored out so both enforce the same
+    hard constraints instead of duplicating them).
+
+    NOTE ON RNG CONSUMPTION: when ks is given explicitly, this function
+    draws nothing from rng. product_rotated_on_grid_unitary's docstring
+    relies on that: with ks explicit, its only rng draws are the n_targ
+    per-qubit Haar unitaries, in a fixed order, so a caller can replay them
+    deterministically from a fresh same-seed rng without this function
+    needing to return them separately.
+    """
+    d = 2 ** n_prec
+    if ks is None:
+        if rng is None:
+            rng = np.random.default_rng()
+        while True:
+            candidate = tuple(int(rng.integers(0, d)) for _ in range(n_targ))
+            if any(candidate) and len(set(candidate)) > 1:
+                return candidate
+    if len(ks) != n_targ:
+        raise ValueError(f"len(ks)={len(ks)} != n_targ={n_targ}")
+    if any(not (0 <= k < d) for k in ks):
+        raise ValueError(f"each k_i must be in [0, {d}); got {ks}")
+    if not any(ks):
+        raise ValueError("not all k_i may be zero (U would be identity)")
+    if len(set(ks)) == 1:
+        raise ValueError("not all k_i may be equal (degenerate case)")
+    return ks
+
+
+def _check_subset_sums_distinct(ks: tuple[int, ...], n_prec: int) -> None:
+    """
+    Soft degeneracy guard (warns, does not raise): "not all k_i equal" rules
+    out only the single most-degenerate case, not partial collisions among
+    the 2^n_targ eigenphases sum_{i in subset} k_i mod 2^n_prec. Collisions
+    are legal -- P(m1==m2)=1 still holds (the mixture-over-eigenvectors
+    derivation doesn't need distinct phases) -- they just mean some
+    eigenspaces are 2+-dimensional, so the m1 marginal groups multiple
+    computational basis states into a shared bin rather than one bin per
+    basis state. Worth flagging, not worth failing on.
+    """
+    d = 2 ** n_prec
+    n = len(ks)
+    sums = [sum(k for i, k in enumerate(ks) if (j >> i) & 1) % d for j in range(2 ** n)]
+    if len(set(sums)) < len(sums):
+        warnings.warn(
+            f"on_grid_unitary: subset sums of ks={ks} are not all distinct mod "
+            f"2^{n_prec} -- some eigenspaces of U are 2+ dimensional. "
+            "P(m1==m2)=1 still holds; the m1 marginal groups multiple basis "
+            "states per bin instead of one bin per basis state.",
+            stacklevel=3,
+        )
+
+
+def on_grid_unitary(n_targ: int, n_prec: int,
+                    rng: np.random.Generator | None = None,
+                    ks: tuple[int, ...] | None = None,
+                    return_factors: bool = False):
+    """
+    Build a diagonal U = tensor_i P(2*pi*k_i / 2^n_prec) whose every
+    eigenphase is an exact multiple of the n_prec-bit QPE grid spacing.
+
+    Why: noiselessly, P(m1==m2) = sum_j |c_j|^2 P_j(m1) P_j(m2) -- a mixture
+    over independent single-stage QPE draws on each eigenvector j. QPE only
+    returns j's phase exactly when that phase already sits on the 2^-n_prec
+    grid; any off-grid phase spreads probability across bins, so m1 and m2
+    can disagree even with zero physical noise (more n_prec does not fix
+    this for a fixed off-grid phase -- Haar U in general has none). Forcing
+    every eigenphase onto the grid makes the noiseless two-stage circuit
+    P(m1==m2)=1 exactly, giving a clean reference: any deviation on real
+    hardware is then attributable to noise, not to this off-grid leakage.
+
+    U[j,j] = exp(2*pi*i * ((sum of k_i over set bits i of j) mod 2^n_prec)
+                  / 2^n_prec)
+    -- equivalent to the tensor-product-of-phase-gates form above because
+    UnitaryGate is little-endian over the supplied qubit list, so bit i of
+    row index j corresponds to target qubit i.
+
+    return_factors=True additionally returns the n_targ per-qubit diagonal
+    2x2 factors [diag(1, exp(2*pi*i*k_i/2^n_prec)) for i in range(n_targ)]
+    (U = tensor_i factors[i], same index convention) as (U, factors), for
+    callers that want to build the product-form circuit
+    (build_qpe_stage_product) instead of the dense one. Default is
+    unchanged (returns U alone) so existing call sites are unaffected.
+    """
+    d = 2 ** n_prec
+    ks = _resolve_ks(n_targ, n_prec, rng, ks)
+    _check_subset_sums_distinct(ks, n_prec)
+
+    dim = 2 ** n_targ
+    diag = np.empty(dim, dtype=complex)
+    for j in range(dim):
+        s = sum(k for i, k in enumerate(ks) if (j >> i) & 1)
+        diag[j] = np.exp(2j * np.pi * (s % d) / d)
+    U = np.diag(diag)
+
+    if not return_factors:
+        return U
+    factors = [np.diag([1.0 + 0j, np.exp(2j * np.pi * ks[i] / d)]) for i in range(n_targ)]
+    return U, factors
+
+
+def random_diagonal_on_grid_unitary(n_targ: int, n_prec: int,
+                                    rng: np.random.Generator,
+                                    return_m_j: bool = False):
+    """
+    Fully generic on-grid diagonal U: ONE independent random integer m_j per
+    computational basis state j (j = 0..2^n_targ-1), U = diag(exp(2*pi*i*
+    m_j/2^n_prec)). Unlike on_grid_unitary (per-QUBIT phases k_i, giving U
+    the tensor-product structure U = tensor_i P(2*pi*k_i/2^n_prec)), this
+    has no tensor-product structure at all -- it is per-BASIS-STATE, so the
+    eigenbasis is still the computational basis (same MCM-disturbance
+    rationale as on_grid_unitary) but the phases carry no per-qubit pattern.
+    Kept additive: on_grid_unitary is untouched.
+
+    Dense path only: goes straight through the unmodified build_qpe_stage/
+    build_full_circuit (no build_qpe_stage_product path -- a fully generic
+    per-basis-state diagonal has no tensor-product structure for that path
+    to exploit).
+
+    rng is required (not optional/defaulted) -- caller controls seeding
+    explicitly for this one, unlike on_grid_unitary's ks=None convenience
+    overload; no fixed-values kwarg here since the deliverable is the
+    seeded-random path, not a known-answer instance.
+
+    Hard ValueError if every m_j is equal (global phase, same degenerate-
+    identity-up-to-phase rationale as on_grid_unitary's not-all-equal
+    check). Soft warning (not a failure) if the m_j are not all mutually
+    distinct -- unlike on_grid_unitary's subset-sum collisions, there is no
+    subset-sum structure here (each basis state gets its own independent
+    draw), so this is a plain "not all distinct" check on the m_j list
+    directly. Collisions are legal: P(m1==m2)=1 still holds; a repeated m_j
+    just makes the corresponding eigenspace 2+-dimensional.
+
+    return_m_j=True additionally returns the drawn list of m_j (as (U,
+    m_j)) so a caller can compute eigenbins/eigen-populations directly
+    instead of re-eigendecomposing a matrix whose diagonal it already knows.
+    """
+    d = 2 ** n_prec
+    dim = 2 ** n_targ
+    m_j = [int(rng.integers(0, d)) for _ in range(dim)]
+
+    if len(set(m_j)) == 1:
+        raise ValueError("not all m_j may be equal (U would be a global phase)")
+    if len(set(m_j)) < len(m_j):
+        warnings.warn(
+            f"random_diagonal_on_grid_unitary: m_j={m_j} are not all mutually "
+            f"distinct -- some eigenspaces of U are 2+ dimensional. "
+            "P(m1==m2)=1 still holds; the m1 marginal groups multiple basis "
+            "states per bin instead of one bin per basis state.",
+            stacklevel=2,
+        )
+
+    diag = np.exp(2j * np.pi * np.array(m_j, dtype=float) / d)
+    U = np.diag(diag)
+
+    if not return_m_j:
+        return U
+    return U, m_j
+
+
+def rotated_on_grid_unitary(n_targ: int, n_prec: int,
+                            rng: np.random.Generator | None = None,
+                            ks: tuple[int, ...] | None = None) -> np.ndarray:
+    """
+    U = V @ D @ V^dagger, D = on_grid_unitary(...), V a Haar-random unitary.
+
+    D alone has the computational basis as its eigenbasis, which is a
+    degenerate probe for the planned hardware MCM-disturbance test (that
+    test models the disturbance as a coherent rotation IN THE EIGENBASIS OF
+    U -- if the eigenbasis is the computational basis the rotation and the
+    measurement basis coincide, hiding exactly the effect being probed).
+    Conjugating by a generic Haar V keeps every eigenphase on-grid (the
+    noiseless P(m1==m2)=1 baseline still holds, since eigenvalues are
+    unchanged by a similarity transform) while making the eigenbasis
+    generic.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    D = on_grid_unitary(n_targ, n_prec, rng=rng, ks=ks)
+    V = haar_random_unitary(2 ** n_targ, rng=rng)
+    return V @ D @ V.conj().T
+
+
+def product_rotated_on_grid_unitary(n_targ: int, n_prec: int,
+                                    rng: np.random.Generator | None = None,
+                                    ks: tuple[int, ...] | None = None,
+                                    return_factors: bool = False):
+    """
+    Cheaper generic-eigenbasis on-grid U: U = tensor_i (v_i P(2*pi*k_i/2^n_prec)
+    v_i^dagger), with v_i an independent Haar-random SINGLE-qubit (2x2)
+    unitary -- unlike rotated_on_grid_unitary's single dense n_targ-qubit V,
+    this stays a tensor product of single-qubit unitaries, so each
+    controlled-U^{2^p} in build_qpe_stage decomposes into n_targ independent
+    controlled-single-qubit gates instead of one dense 2^n_targ x 2^n_targ
+    controlled unitary. Eigenphases stay on-grid (same k_i's as
+    on_grid_unitary -- P(m1==m2)=1 still holds); the eigenbasis becomes the
+    generic PRODUCT basis {v_i|0>, v_i|1>} instead of the computational
+    basis, which is the property rotated_on_grid_unitary wants for the
+    planned MCM-disturbance probe, at a fraction of the transpiled cost.
+
+    Kronecker order matches on_grid_unitary: target qubit 0 is the
+    RIGHTMOST kron operand (bit 0 of the computational-basis index is
+    qubit 0, UnitaryGate's little-endian convention).
+
+    RNG CONSUMPTION ORDER (load-bearing for verification code that needs
+    the v_i's without this function returning them): when ks is given
+    explicitly, _resolve_ks draws nothing, so the only draws are
+    haar_random_unitary(2, rng=rng) for i = 0, 1, ..., n_targ-1 in that
+    order. A caller can reconstruct the same v_i sequence by replaying
+    those draws from a fresh Generator seeded identically.
+
+    return_factors=True additionally returns the n_targ per-qubit 2x2
+    factors u_i = v_i @ P_i @ v_i^dagger (U = tensor_i factors[i], same
+    index convention) as (U, factors), for callers that want to build the
+    product-form circuit (build_qpe_stage_product) instead of the dense
+    one. Default is unchanged (returns U alone) so existing call sites are
+    unaffected.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    d = 2 ** n_prec
+    ks = _resolve_ks(n_targ, n_prec, rng, ks)
+    _check_subset_sums_distinct(ks, n_prec)
+
+    U = np.array([[1.0]], dtype=complex)
+    u_list = []
+    for i in range(n_targ):
+        theta_i = 2 * np.pi * ks[i] / d
+        P_i = np.diag([1.0, np.exp(1j * theta_i)])
+        v_i = haar_random_unitary(2, rng=rng)
+        u_i = v_i @ P_i @ v_i.conj().T
+        u_list.append(u_i)
+        U = np.kron(u_i, U)
+
+    if not return_factors:
+        return U
+    return U, u_list
 
 
 def _stable_matrix_power(U: np.ndarray, power: int) -> np.ndarray:
@@ -136,8 +381,96 @@ def build_qpe_stage(n_prec: int, U: np.ndarray) -> QuantumCircuit:
     return qc
 
 
-def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray,
-                       target_init_seed: int) -> QuantumCircuit:
+def _factor_power(u_i: np.ndarray, n_prec: int, power: int) -> np.ndarray:
+    """
+    Exact u_i^power for a single 2x2 unitary factor, computed closed-form
+    instead of via repeated-squaring + SVD reprojection
+    (_stable_matrix_power) -- unlike an 8x8 dense controlled-U, a 2x2
+    factor's spectral decomposition is cheap, so there's no reason to
+    accept squaring error here at all.
+
+    Diagonal case (the on-grid construction diag(1, exp(2*pi*i*k/2^n_prec))
+    used by on_grid_unitary): exponentiate via exact MODULAR INTEGER
+    arithmetic on the phase index k (new_k = k*power mod 2^n_prec), not
+    `phase**power` -- raising a float phase to a large integer power the
+    naive way is exactly the drift _stable_matrix_power exists to correct
+    for the dense case, and here it's free to avoid entirely.
+
+    Non-diagonal case (e.g. product_rotated_on_grid_unitary's v_i-rotated
+    factor u_i = v_i @ diag(1, e^{i*theta}) @ v_i^dagger): eigendecompose
+    via np.linalg.eig (robust generic fallback -- this function only sees
+    a plain 2x2 matrix, not how it was constructed) and raise the
+    eigenvalues to `power` in floating point, then reassemble. u_i is
+    unitary (normal) and, for every factor this project actually
+    constructs, non-degenerate (k_i=0 collapses to the identity, which is
+    diagonal and caught above), so np.linalg.eig returns an eigenvector
+    matrix that is unitary to machine precision and v_i^dagger is a valid
+    inverse.
+    """
+    if np.allclose(u_i, np.diag(np.diagonal(u_i)), atol=1e-10):
+        d = 2 ** n_prec
+        theta = float(np.angle(u_i[1, 1]))
+        k = int(round(theta * d / (2 * np.pi))) % d
+        new_k = (k * power) % d
+        return np.diag([1.0 + 0j, np.exp(2j * np.pi * new_k / d)])
+
+    eigvals, eigvecs = np.linalg.eig(u_i)
+    return eigvecs @ np.diag(eigvals ** power) @ eigvecs.conj().T
+
+
+def build_qpe_stage_product(n_prec: int, factors: list[np.ndarray]) -> QuantumCircuit:
+    """
+    Product-form equivalent of build_qpe_stage for U = tensor_i factors[i]
+    (true of on_grid_unitary and product_rotated_on_grid_unitary, NOT
+    rotated_on_grid_unitary's dense V). Each controlled-U^{2^p} becomes
+    n_targ independent controlled-SINGLE-QUBIT gates instead of one dense
+    2^n_targ x 2^n_targ controlled unitary -- qiskit's generic
+    controlled-unitary synthesis doesn't exploit tensor-product structure,
+    so for product-form U this produces an identical circuit action (see
+    two_stage_on_grid_baseline.py's Operator-equivalence check) at a
+    fraction of the transpiled gate count.
+
+    factors[i] is the 2x2 unitary acting on target qubit i, same
+    Kronecker/index convention as on_grid_unitary and
+    product_rotated_on_grid_unitary (U = tensor_i factors[i], qubit 0 the
+    rightmost kron operand). Same qubit layout, MSB-first control-power
+    convention (precision qubit k controls power 2^(n_prec-1-k)), and
+    inverse-QFT-on-reversed-prec placement as build_qpe_stage -- see that
+    function's docstring. Duplicated rather than shared because the
+    controlled-gate-application loop body genuinely differs (n_targ
+    single-qubit gates vs. one n_targ-qubit gate); build_qpe_stage itself
+    is untouched by this addition.
+    """
+    n_targ = len(factors)
+    total = n_prec + n_targ
+
+    qc = QuantumCircuit(total, name="QPE_product")
+    prec = list(range(n_prec))
+    targ = list(range(n_prec, n_prec + n_targ))
+
+    qc.h(prec)
+
+    # Same MSB-first convention as build_qpe_stage: precision qubit k
+    # (k=0 first) controls power 2^{n_prec-1-k}.
+    for k in range(n_prec):
+        power = 2 ** (n_prec - 1 - k)
+        for i in range(n_targ):
+            u_i_pow = _factor_power(factors[i], n_prec, power)
+            cU = UnitaryGate(u_i_pow, label=f"u{i}^{power}").control(1)
+            qc.append(cU, [prec[k], targ[i]])
+
+    iqft = QFTGate(n_prec).inverse()
+    # Same reversed-index placement as build_qpe_stage -- see that
+    # function's comment (known-bug list item 4).
+    qc.append(iqft, prec[::-1])
+
+    return qc
+
+
+def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray | None,
+                       target_init_seed: int,
+                       eigenstate: bool = False,
+                       factors: list[np.ndarray] | None = None) -> QuantumCircuit:
     """
     Two-stage QPE QPUF, flattened to one quantum + one classical register
     (Braket OpenQASM 3 allows only one of each).
@@ -155,7 +488,21 @@ def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray,
         q[n_targ+n_prec .. n_targ+2*n_prec-1]       → prec_b  (stage 2)
         c[0 .. n_prec-1]                            → stage-1 outcomes (low bits)
         c[n_prec .. 2*n_prec-1]                     → stage-2 outcomes (high bits)
+
+    factors: optional list of n_targ 2x2 unitaries (U = tensor_i
+    factors[i], from on_grid_unitary(..., return_factors=True) or
+    product_rotated_on_grid_unitary(..., return_factors=True)). When
+    given, both QPE stages are built via build_qpe_stage_product instead
+    of the dense build_qpe_stage(n_prec, U) -- factors takes precedence
+    over U for circuit construction. U itself becomes optional in that
+    case (pass U=None if the caller has no other use for it, e.g. no need
+    to report an expected eigenphase); it plays no role in the built
+    circuit when factors is supplied. When factors is None (the default),
+    behavior is exactly the original dense-U path, unchanged.
     """
+    if factors is None and U is None:
+        raise ValueError("build_full_circuit requires U, factors, or both")
+
     n_total    = n_targ + 2 * n_prec
     q          = QuantumRegister(n_total, "q")
     c          = ClassicalRegister(2 * n_prec, "c")
@@ -165,17 +512,29 @@ def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray,
     prec_a_idx = list(range(n_targ,             n_targ + n_prec))
     prec_b_idx = list(range(n_targ + n_prec,    n_targ + 2 * n_prec))
 
-    # Target initialisation: one RY+RZ per qubit, seeded independently of U.
-    init_rng = np.random.default_rng(seed=target_init_seed)
-    for i in targ_idx:
-        theta0 = init_rng.uniform(0, np.pi)
-        phi0   = init_rng.uniform(0, 2 * np.pi)
-        qc.ry(theta0, q[i])
-        qc.rz(phi0,   q[i])
+    # Target initialisation: |1...1> (a known-answer eigenstate probe) or,
+    # by default, one RY+RZ per qubit seeded independently of U.
+    if eigenstate:
+        for i in targ_idx:
+            qc.x(q[i])
+    else:
+        init_rng = np.random.default_rng(seed=target_init_seed)
+        for i in targ_idx:
+            theta0 = init_rng.uniform(0, np.pi)
+            phi0   = init_rng.uniform(0, 2 * np.pi)
+            qc.ry(theta0, q[i])
+            qc.rz(phi0,   q[i])
 
-    # Stage 1 QPE on prec_a + targ. build_qpe_stage expects the precision
-    # qubits first, then the target qubits.
-    qpe1 = build_qpe_stage(n_prec, U)
+    # Stage builder: product-form (build_qpe_stage_product) when factors is
+    # supplied, else the original dense-U path (build_qpe_stage), unchanged.
+    def _build_stage() -> QuantumCircuit:
+        if factors is not None:
+            return build_qpe_stage_product(n_prec, factors)
+        return build_qpe_stage(n_prec, U)
+
+    # Stage 1 QPE on prec_a + targ. build_qpe_stage[_product] expects the
+    # precision qubits first, then the target qubits.
+    qpe1 = _build_stage()
     qc.append(qpe1, prec_a_idx + targ_idx)
 
     # Mid-circuit measurement of stage-1 precision register. This collapses
@@ -184,7 +543,7 @@ def build_full_circuit(n_prec: int, n_targ: int, U: np.ndarray,
     qc.measure([q[i] for i in prec_a_idx], [c[k] for k in range(n_prec)])
 
     # Stage 2 QPE on prec_b + (already-collapsed) targ.
-    qpe2 = build_qpe_stage(n_prec, U)
+    qpe2 = _build_stage()
     qc.append(qpe2, prec_b_idx + targ_idx)
 
     qc.measure([q[i] for i in prec_b_idx], [c[n_prec + k] for k in range(n_prec)])

@@ -1,0 +1,78 @@
+{
+  "device_name": "Forte-Enterprise-1",
+  "device_arn": "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1",
+  "shots": 1000,
+  "seed": 9,
+  "m_j": [
+    6,
+    13,
+    15,
+    4,
+    1,
+    9,
+    10,
+    12
+  ],
+  "ideal_bins": [
+    1,
+    4,
+    6,
+    9,
+    10,
+    12,
+    13,
+    15
+  ],
+  "n_targ": 3,
+  "n_prec": 4,
+  "target_init_seed": 99,
+  "gate_counts": {
+    "n_1q": 543,
+    "n_2q": 168,
+    "total": 711
+  },
+  "gate_limit": 2000,
+  "measured_physical_qubits_clbit_order": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "decode_convention": {
+    "label": "raw Braket convention B (see decode_mcm_qpuf_result.py module docstring, 'THE CONVENTION CONFLICT')",
+    "source_call": "AwsQuantumTask(arn).result().measurement_counts -- NOT via qiskit_braket_provider, which applies a {k[::-1]: v} bit-reversal producing the REJECTED convention A instead.",
+    "rule": "Raw Braket measurement_counts keys are one character per MEASURED qubit, ordered by ASCENDING physical qubit index. With measured_qubits=[3, 4, 5, 6, 7, 8, 9, 10] (q0-q2 = target, unmeasured): char 0 -> q3; char 1 -> q4; char 2 -> q5; char 3 -> q6; char 4 -> q7; char 5 -> q8; char 6 -> q9; char 7 -> q10. q3-q6 are the stage-1 precision register (clbits c[0..3]) and q7-q10 are stage-2 (clbits c[4..7]); build_qpe_stage's MSB-first convention makes q3 the MSB of m1 and q7 the MSB of m2. So, with bits = the raw counts key string read left to right: m1 = int(bits[0:4], 2), m2 = int(bits[4:8], 2)."
+  },
+  "ideal_joint_summary": {
+    "p_m1_eq_m2": 0.9999999999999999,
+    "marg1": [
+      0.0,
+      0.1597335962903612,
+      0.0,
+      0.0,
+      0.0854662291537003,
+      0.0,
+      0.07635087778699538,
+      0.0,
+      0.0,
+      0.16590270750110173,
+      0.17215497358254903,
+      0.0,
+      0.1788038139153128,
+      0.07929964415202098,
+      0.0,
+      0.0822881576179585
+    ],
+    "full_matrix_file": "on_grid_seed9_ideal_joint.json"
+  },
+  "qasm_file": "on_grid_seed9_submission.qasm",
+  "program_order_fix": {
+    "bug_fixed": "A single global transpile() call on build_full_circuit's output reorders instructions by DAG DEPENDENCY, not program order: the stage-1 measure only touches prec_a qubits/clbits, so nothing forces it before stage-2's gates on prec_b/target, and Qiskit pushed every gate (including stage-2's) before any measurement -- destroying the MCM's textual position in the exported QASM.",
+    "fix": "Each piece (target-prep+stage-1+stage-1-measure; stage-2+stage-2-measure) is transpiled SEPARATELY at the same basis/optimization settings, then concatenated in program order into a fresh circuit with NO further transpile() call -- confirmed in the exported QASM TEXT (not just the Python object): stage-1 measures appear textually after the last stage-1 gate and before the first stage-2 gate.",
+    "noiseless_equivalence_caveat": "LocalSimulator (AerSimulator) reproduces the ideal joint under this manifest's decode rule: 100% on-diagonal, correct per-bin marginal. This confirms program-order preservation is NECESSARY for a correct submission but it is NOT SUFFICIENT to prove the physical device executes the measurement in that position -- noiseless statistics are IDENTICAL whether the mid-circuit measurement is genuinely performed mid-circuit or the measurement is effectively deferred by the server-side compiler, since there is no classical feedforward in this circuit for either ordering to affect. Whether IonQ/Braket's server-side compiler preserves genuine mid-circuit execution (vs. an internal deferred-measurement rewrite) is a property of that compiler, UNVERIFIED here, and only a real hardware run (or documented compiler behavior) could settle it."
+  }
+}

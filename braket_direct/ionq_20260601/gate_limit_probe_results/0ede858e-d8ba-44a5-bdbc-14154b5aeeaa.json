@@ -1,0 +1,27 @@
+{
+  "_provenance": "Relayed from the DCV Worker session 2026-08-31; fetched live from AWS Braket. action.source (47107 chars of submitted OpenQASM) was NOT included in transit -- it is retained by AWS and on the DCV box at this same path. Everything else is verbatim and unsummarised. NOTE: 45 unique outcomes, not the 44 quoted in the original relay -- miscount in the description, confirmed by DCV Worker on recount; the data itself is sound (sums to exactly 100 shots, all keys 6-bit).",
+  "_counts_convention": "RAW BRAKET, confirmed by DCV Worker 2026-08-31 via the exact call chain AwsQuantumTask(arn).result().measurement_counts -- NO qiskit_braket_provider anywhere in the path, so the string has NOT been character-reversed. Braket convention: leftmost character = LOWEST measured-qubit index. With measured_qubits=[3,4,5,6,7,8]: char 0 = q3. This matters because qiskit_braket_provider reverses the string character-for-character; decoding raw-Braket counts under the provider convention would silently invert every (m1,m2) pair. Cf. CLAUDE.md known-bug item 4.",
+  "_measured_qubit_layout": "9 qubits: q0-q2 target (unmeasured), q3-q5 precision stage 1 (-> c[0..2], m1), q6-q8 precision stage 2 (-> c[3..5], m2), per build_full_circuit in submit_QPUF_ntarg.py. Combined with the raw-Braket convention above: chars 0-2 = m1, chars 3-5 = m2. Within each 3-bit group prec[0] is the MOST significant bit of that stage's integer, because build_qpe_stage assigns qubit k the controlled power U^(2^(n_prec-1-k)) (MSB-first) and applies the inverse QFT to prec[::-1]. To be re-derived independently by the verifier, not taken from this note.",
+  "task_metadata": {
+    "id": "arn:aws:braket:us-east-1:767397707562:quantum-task/0ede858e-d8ba-44a5-bdbc-14154b5aeeaa",
+    "shots": 100,
+    "deviceId": "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1",
+    "deviceParameters": {"paradigmParameters": {"qubitCount": 9, "disableQubitRewiring": false}, "errorMitigation": null},
+    "createdAt": "2026-08-30T15:05:32.395Z",
+    "endedAt": "2026-08-30T15:18:31.751Z",
+    "status": "COMPLETED"
+  },
+  "circuit_params": {"n_targ": 3, "n_prec": 3, "seed": 10, "target_init_seed": 99},
+  "measured_qubits": [3, 4, 5, 6, 7, 8],
+  "additional_metadata": {"ionqMetadata": {"sharpenedProbabilities": null}},
+  "measurement_counts": {
+    "011000": 4, "011001": 7, "001011": 1, "001001": 6, "001101": 2, "011101": 2,
+    "111000": 1, "111001": 4, "100101": 2, "111110": 3, "111010": 4, "011010": 4,
+    "011011": 6, "000100": 1, "011110": 1, "011111": 3, "101110": 2, "000001": 1,
+    "011100": 3, "101101": 2, "100000": 4, "000000": 2, "010101": 1, "110101": 1,
+    "010010": 1, "001000": 3, "001100": 1, "000110": 1, "100001": 1, "110001": 2,
+    "110110": 2, "110100": 1, "100100": 5, "001010": 2, "001111": 1, "111111": 1,
+    "000010": 1, "101111": 1, "001110": 1, "101000": 2, "000101": 1, "101011": 2,
+    "111011": 1, "101100": 2, "000011": 1
+  }
+}

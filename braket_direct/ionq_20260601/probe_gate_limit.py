@@ -89,6 +89,27 @@ AwsDevice or calls .run(). Real submission requires --execute AND a
 typed "y"/"yes" interactive confirmation that reprints device, task
 count, and total cost; it is refused outright if stdin is not a TTY (see
 confirm_submit()). --dry-run always wins if both flags are given.
+
+RESULT (2026-08-30) -- the real limit is 2,000 gates, not the documented 5,000
+--------------------------------------------------------------------------------
+Real submissions to Forte-Enterprise-1 confirmed a hard per-circuit gate
+limit of 2,000, enforced at CreateQuantumTask validation -- not the 5,000
+figure AWS's documentation reportedly states. Observed outcomes:
+  1,915 gates -> ACCEPTED
+  2,583 gates -> REJECTED, verbatim error:
+      "The total number of gates in the circuit is too high. Please ensure
+       that the number of gates does not exceed 2,000. It is currently
+       2,583."
+  3,231 gates -> REJECTED (same limit)
+The limit is per-circuit and shot-independent, and the counted quantity is
+exactly n_1q + n_2q (measurements excluded) -- this repo's own gate count
+matched AWS's reported count on all three probes. This confirms the
+ground-truth principle invoked above: trust the device's rejection over
+the doc. Downstream campaigns should treat 2,000 as the real ceiling (see
+ionq_mitigation_common.MAX_GATES_PER_CIRCUIT in
+braket_direct/20260828_ionq_error_mitigation/, which enforces it) --
+this script itself keeps no such guard, since its entire purpose is to
+submit circuits that may exceed the limit in order to find it.
 """
 
 import argparse
