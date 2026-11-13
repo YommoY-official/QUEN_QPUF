@@ -18,23 +18,23 @@ known (phase 1/2^d, target |1>)}. Each task is logged to the manifest
 (job_results/job_log.txt) the moment it is submitted, with the OpenQASM
 program that was sent.
 """
-import argparse, os, sys, warnings
+import argparse, os, re, sys, warnings
 from datetime import datetime, timezone
 import numpy as np
 warnings.filterwarnings("ignore")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from iqm_qpuf_common import (DEVICES, haar_random_unitary, known_phase_unitary, encode_unitary,
-                             load_caps, build_program, readout_cal_programs, to_qasm, gate_counts, check_dynamic_rules,
-                             estimate_cost, est_success, task_tags, append_job_log)
+                             load_caps, fetch_live_caps, record_scores, build_program, readout_cal_programs, to_qasm, gate_counts, check_dynamic_rules,
+                             estimate_cost, est_success, idle_cal_programs, task_tags, append_job_log)
 
 SEED, TARGET_INIT_SEED, N_TARG = 100, 99, 1
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "job_results")
 
 
-def build_jobs(device, ds, arms, caps, layout="primary", cal=True):
+def build_jobs(device, ds, arms, caps, layout="primary", cal=True, idle_cal=False, targets=("haar", "known")):
     jobs = []
     for d in ds:
-        for target in ("haar", "known"):
+        for target in targets:
             if target == "haar":
                 U, init, phi = haar_random_unitary(2 ** N_TARG, np.random.default_rng(SEED)), TARGET_INIT_SEED, None
             else:
@@ -43,6 +43,11 @@ def build_jobs(device, ds, arms, caps, layout="primary", cal=True):
                 p = build_program(arm, d, N_TARG, U, init, caps, layout=layout)
                 jobs.append(dict(role="qpuf", label=f"{arm} d={d} {target}", d=d, arm=arm, target=target, phi=phi, U=U,
                                  prog=p, qasm=to_qasm(p), counts=gate_counts(p), rules=check_dynamic_rules(p, caps)))
+    if idle_cal:
+        for j in [j for j in jobs if j["arm"] == "B" and j["target"] == "known"]:
+            for st, p in idle_cal_programs(j["prog"]).items():
+                jobs.append(dict(role="idle_cal", label=f"idle cal |{st}> d={j['d']}", d=j["d"], arm="idlecal", target="cal", phi=None,
+                                 U=np.eye(2), prog=p, qasm=to_qasm(p), counts=gate_counts(p), rules=check_dynamic_rules(p, caps)))
     if cal:   # readout calibration on exactly the qubits the batch measures
         qs = sorted({q for j in jobs for q in j["prog"]["order"]})
         for st, p in readout_cal_programs(qs).items():
@@ -67,6 +72,16 @@ def report(jobs, device, shots, caps):
             print(f"  {j['label']:<18}" + "  ".join(
                 f"${a}->${b} {'COUPLER' if tuple(sorted((a, b))) in adj else 'non-coupler'}"
                 f" (ro {fro.get(str(a), '?')}/{fro.get(str(b), '?')})" for a, b in zip(j["prog"]["p1_stage1"], j["prog"]["anc"])))
+    t1, t2, fro = (caps.get(k) or {} for k in ("t1", "t2", "fro"))
+    qs = sorted({q for j in jobs if j["prog"]["arm"] in ("B", "Breuse") for q in j["prog"]["p1_stage1"] + j["prog"]["anc"]})
+    if qs:
+        sc = record_scores(caps) or {}
+        print(f"\nrecord qubits (P1 and ancilla); calibration {caps.get('calibration_updatedAt', 'unknown')}; T in us, '?' = not in caps:")
+        print("  qubit    T1   T2echo  e(1->0)  e(0->1)    fRO  score")
+        for q in qs:
+            g = lambda k, f="{}": (f.format(caps[k][str(q)]) if caps.get(k) and str(q) in caps[k] else "?")
+            print(f"  ${q:<4}{g('t1', '{:7.1f}')}{g('t2', '{:8.1f}')}{g('readout_error_1_to_0', '{:9.4f}')}{g('readout_error_0_to_1', '{:9.4f}')}{g('fro', '{:8.4f}')}  {sc.get(q, float('nan')):.3f}")
+        if not t1: print("  WARNING: caps file has no T1 data; layout selection used readout only")
     errs = sorted({e for j in jobs for e in j["rules"][0]}); warns = sorted({w for j in jobs for w in j["rules"][1]})
     print("\nIQM dynamic-circuit rules:", "OK" if not errs else "VIOLATIONS")
     for e in errs: print("   ERROR  ", e)
@@ -91,16 +106,29 @@ def main():
                     help="single circuit: known-answer arm B, d=2, 200 shots, primary layout (the originally submitted smoke test), no calibration")
     ap.add_argument("--smoke-nonadj", action="store_true",
                     help="like --smoke but nonadj layout: copy pairs are not couplers, good-readout qubits only (program B_d2_known_nonadj.qasm)")
+    ap.add_argument("--smoke2", action="store_true",
+                    help="T1-aware nonadj known-answer arm B at d=2 + the two idle-cal circuits, 1000 shots each (3 tasks)")
+    ap.add_argument("--idle-cal", action="store_true", help="add the two idle-calibration twins of every known-answer arm-B circuit")
+    ap.add_argument("--offline", action="store_true", help="use the cached device_caps file's calibration (dry-run only; a real submission always pulls live)")
     ap.add_argument("--no-cal", action="store_true", help="omit the two readout-calibration circuits")
     ap.add_argument("--dry-run", action="store_true", help="build and report only; submit nothing")
     a = ap.parse_args()
 
     caps = load_caps(a.device)
+    if not a.offline or not a.dry_run:     # real submission never uses cached calibration
+        try: caps = fetch_live_caps(a.device, caps)
+        except Exception as e:
+            if not a.dry_run: sys.exit(f"Refusing: cannot pull live device properties ({type(e).__name__}: {e}). Run on the DCV box.")
+            print(f"WARNING: live properties unavailable ({type(e).__name__}); using CACHED calibration {caps.get('calibration_updatedAt')} -- layout may be stale")
+    print(f"calibration used: {caps.get('calibration_updatedAt', 'unknown')}  ({'LIVE pull' if caps.get('live') else 'CACHED file'})")
     if a.smoke or a.smoke_nonadj:
         a.smoke = True
         a.d, a.arms, a.shots, a.layout, a.no_cal = [2], ["B"], 200, "nonadj" if a.smoke_nonadj else "primary", True
+    targets = ("haar", "known")
+    if a.smoke2:
+        a.d, a.arms, a.shots, a.layout, a.no_cal, a.idle_cal, targets = [2], ["B"], 1000, "nonadj", True, True, ("known",)
     try:
-        jobs = build_jobs(a.device, a.d, a.arms, caps, a.layout, not a.no_cal)
+        jobs = build_jobs(a.device, a.d, a.arms, caps, a.layout, not a.no_cal, a.idle_cal, targets)
     except RuntimeError as e:
         sys.exit(f"Could not build the {a.layout!r} layout for d={a.d}: {e}")
     if a.smoke: jobs = [j for j in jobs if j["target"] == "known"]
@@ -110,7 +138,7 @@ def main():
     os.makedirs(os.path.join(RESULTS_DIR, "programs"), exist_ok=True)
     print(f"\nlayout mode: {a.layout}")
     for j in jobs:                                   # inspectable copy of every program, even on --dry-run
-        open(os.path.join(RESULTS_DIR, "programs", j["label"].replace(" ", "_").replace("=", "") + ("_nonadj" if a.layout == "nonadj" else "") + ".qasm"), "w").write(j["qasm"])
+        open(os.path.join(RESULTS_DIR, "programs", re.sub(r"[|>]", "", j["label"].replace(" ", "_").replace("=", "")) + ("_smoke2" if a.smoke2 else "_nonadj" if a.layout == "nonadj" else "") + ".qasm"), "w").write(j["qasm"])
     if a.dry_run:
         print("\n--dry-run: nothing submitted. Programs written to job_results/programs/."); return
     if not caps["real"]:
@@ -136,7 +164,9 @@ def main():
                    known_phase=j["phi"], n_shots=a.shots, verbatim=True, seed=SEED, target_init_seed=TARGET_INIT_SEED,
                    measure=[list(m) for m in p["measure"]], order=p["order"], gate_counts=j["counts"],
                    layout=dict(t=p["t_sites"], p1=p["p1_stage1"], anc=p["anc"], p2=p["p2"]),
-                   caps_real=caps["real"], unitary=encode_unitary(j["U"]), qasm=j["qasm"])
+                   caps_real=caps["real"], calibration_updatedAt=caps.get("calibration_updatedAt"), calibration_live=bool(caps.get("live")),
+                   record_qubit_calibration={str(q): {k: caps[k].get(str(q)) for k in ("t1", "t2", "readout_error_0_to_1", "readout_error_1_to_0", "fro") if caps.get(k)}
+                                             for q in p["p1_stage1"] + p["anc"]}, unitary=encode_unitary(j["U"]), qasm=j["qasm"])
         append_job_log(RESULTS_DIR, rec)             # log immediately, one record per task
         print(f"  {j['label']:<24} {task.id}")
     print(f"\n{len(jobs)} tasks submitted. Retrieve with:  python checkRetrieve.py")

@@ -147,6 +147,50 @@ def _route(logical, sites, caps, allowed, seed=7):
 
 # -- program planner ----------------------------------------------------------
 GOOD_RO = 0.98   # readout fidelity floor for the nonadj layout
+T_IDLE = 10.0    # us; ASSUMED idle window of the m1 record (not measured; --idle-cal measures the real effect)
+K_BEST = 8       # nonadj layout: P1/ancillas drawn from the K best-scoring qubits of the region
+
+
+def record_scores(caps):
+    """Lower is better. score(q) = e(0->1) + e(1->0) + T_IDLE/T1  (first-order decay of a |1> record bit over
+    the idle window). State-dependent readout is used because e(1->0) is 2-6x e(0->1) on this chip, so a
+    symmetric fRO under-penalises |1> bits. None unless the caps carry t1 and both readout errors."""
+    if not (caps.get("t1") and caps.get("readout_error_0_to_1") and caps.get("readout_error_1_to_0")): return None
+    g = lambda k, q: caps[k].get(str(q))
+    return {q: g("readout_error_0_to_1", q) + g("readout_error_1_to_0", q) + T_IDLE / g("t1", q)
+            for q in caps["nodes"] if None not in (g("t1", q), g("readout_error_0_to_1", q), g("readout_error_1_to_0", q))}
+
+
+def _find_key(o, pred, path=""):
+    if isinstance(o, dict):
+        for k, v in o.items():
+            if pred(k) and not isinstance(v, (dict, list)): yield path + "/" + k, v
+            yield from _find_key(v, pred, path + "/" + k)
+    elif isinstance(o, list):
+        for i, v in enumerate(o): yield from _find_key(v, pred, f"{path}[{i}]")
+
+
+def parse_live_props(raw):
+    """Per-qubit calibration from a Braket IQM properties dict (deviceCapabilities.provider.properties.one_qubit,
+    seconds -> us). 'T2' in the properties is the RAMSEY time; the echo time is 'T2_echo'. Returns dict of caps fields."""
+    oq = raw["provider"]["properties"]["one_qubit"] if "provider" in raw else raw["deviceCapabilities"]["provider"]["properties"]["one_qubit"]
+    out = {k: {} for k in ("t1", "t2", "t2_ramsey", "fro", "readout_error_0_to_1", "readout_error_1_to_0")}
+    for q, v in oq.items():
+        out["t1"][q] = v["T1"] * 1e6; out["t2"][q] = v["T2_echo"] * 1e6; out["t2_ramsey"][q] = v["T2"] * 1e6
+        out["fro"][q] = v["fRO"]; out["readout_error_0_to_1"][q] = v["readout_error_0_to_1"]
+        out["readout_error_1_to_0"][q] = v["readout_error_1_to_0"]
+    ts = [v for k, v in _find_key(raw, lambda k: "updatedat" in k.lower() or "calibration" in k.lower() and "time" in k.lower())]
+    out["calibration_updatedAt"] = str(ts[0]) if ts else "UNKNOWN (no updatedAt key found in properties)"
+    return out
+
+
+def fetch_live_caps(device, caps):
+    """Overlay CURRENT calibration (T1, T2, state-dependent readout, timestamp) from the AWS properties onto the
+    cached topology. Needs AWS credentials (the DCV box). ro_avoid and the median gate fidelities stay as cached."""
+    from braket.aws import AwsDevice
+    raw = json.loads(AwsDevice(DEVICES[device]["arn"]).properties.json())
+    live = parse_live_props(raw.get("deviceCapabilities", raw) if isinstance(raw.get("deviceCapabilities"), dict) else raw)
+    return dict(caps, **live, live=True)
 
 
 def build_program(arm, d, nt, U, init, caps, seed=7, layout="primary"):
@@ -179,6 +223,10 @@ def _build(arm, d, nt, U, init, caps, hub, seed=7, layout="primary"):
     if layout == "nonadj":     # P1 and ancillas only on good-readout qubits; no P1_i-ancilla_i coupler
         good = {int(q) for q, f in (caps.get("fro") or {}).items() if f >= GOOD_RO}
         avoid = avoid | (set(caps["nodes"]) - good)
+        sc = record_scores(caps)
+        if sc:   # the m1 record idles through all of stage 2: T1 and state-dependent readout both matter
+            best = set(sorted((q for q in caps["nodes"] if q in sc), key=sc.get)[:K_BEST])
+            avoid = avoid | (set(caps["nodes"]) - best)
     t_sites = [hub] + _bfs_order(adj, hub, {hub})[:nt - 1]
     p1 = _bfs_order(adj, hub, set(t_sites) | avoid)[:d]
     body, nodes = [], set(caps["nodes"])
@@ -208,6 +256,7 @@ def _build(arm, d, nt, U, init, caps, hub, seed=7, layout="primary"):
         if len(p2_start) < d: raise RuntimeError("not enough connected sites for stage 2")
     # Stage 2 may not route through P1 (they hold m1 until the final re-read and
     # a SWAP through them would move the state we want to read back in place).
+    split = len(body)       # body[split:] is stage 2 (used by the idle-calibration twin)
     allowed = nodes - set(anc) - (set() if arm == "Breuse" else set(p1_f))
     ops, fin = _route(stage_logical(d, nt, U), p2_start + t_f, caps, allowed, seed)
     body += ops; p2_f = fin[:d]
@@ -218,7 +267,8 @@ def _build(arm, d, nt, U, init, caps, hub, seed=7, layout="primary"):
     order = sorted(set(q for _, _, q in meas))
     assert len(order) == len(meas), "two logical qubits ended on one physical qubit"
     return dict(arm=arm, d=d, nt=nt, body=body, measure=meas, order=order,
-                p1_stage1=p1_f, anc=anc, t_sites=t_f, p2=p2_f)
+                p1_stage1=p1_f, anc=anc, t_sites=t_f, p2=p2_f, split=split,
+                t_one=(init == "ones"))
 
 
 # -- Braket emission ----------------------------------------------------------
@@ -368,6 +418,24 @@ def readout_cal_programs(qubits):
         body = [("prx", q, PI if st == "1" else 0.0, 0.0) for q in qubits]
         out[st] = dict(arm="cal", d=0, nt=0, body=body, order=sorted(qubits), measure=[("cal", i, q) for i, q in enumerate(sorted(qubits))],
                        t_sites=[], p1_stage1=[], anc=[], p2=[], cal_state=st)
+    return out
+
+
+def idle_cal_programs(prog):
+    """Idle calibration for a built arm-B program: stage 1 and the copy are replaced by plain
+    state preparation of P1 and the ancillas (|1..1> and the |0..0> twin), no measure_ff; stage 2
+    is the identical op list; the same qubits are measured. So the record qubits see readout error
+    plus T1/T2 decay over the real idle window (stage 2) and nothing else. The target is set to
+    |1> when the real program used the known-answer init (it does not affect the record qubits)."""
+    assert prog["arm"] == "B", "idle calibration is defined for arm B"
+    out = {}
+    for st in ("0", "1"):
+        th = PI if st == "1" else 0.0
+        prep = [("prx", q, th, 0.0) for q in prog["p1_stage1"] + prog["anc"]]
+        if prog["t_one"]: prep += [("prx", q, PI, 0.0) for q in prog["t_sites"]]
+        out[st] = dict(arm="idlecal", d=prog["d"], nt=prog["nt"], body=prep + prog["body"][prog["split"]:],
+                       order=prog["order"], measure=prog["measure"], t_sites=prog["t_sites"],
+                       p1_stage1=prog["p1_stage1"], anc=prog["anc"], p2=prog["p2"], cal_state=st)
     return out
 
 
