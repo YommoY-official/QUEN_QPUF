@@ -30,18 +30,32 @@ Default arms are now A and B.
 - `query_device_caps.py` -- read-only; writes `device_caps_<dev>.json`.
 - `device_caps_garnet.json` -- edges, groups, partial readout fidelities, from the
   DCV data. Its groups were read off AWS figures, not from a published property.
-- `validate_local.py` -- free local checks (Aer).
+- `validate_local.py` -- free local checks (Aer). Self-contained: the noiseless
+  reference is `reference_pairs` in `iqm_qpuf_common.py` (one statevector of the
+  whole two-stage circuit); nothing is imported from `docs/`. Also checks the
+  smoke layout (non-coupler pairs, known answer m1=m2=1, ancilla == re-read P1,
+  rules OK). All checks pass.
 - `submit_qpuf_mcm.py` -- builds tasks, `--dry-run`, real submission.
 - `checkRetrieve.py` -- retrieves results, decodes (m1, m2), writes `job_results/<uuid>.json`.
 - `job_results/` -- manifest `job_log.txt` (one record per task, written at submit) and programs.
 
 ## Submit options
 
-- `--smoke`: a single circuit, known-answer arm B, d=2, 200 shots, primary
-  layout, no calibration. Run this first.
-- `--layout primary|adjacent`: primary puts the ancilla anywhere in P1's qubit
-  group (`cc_prx` is classically controlled). Adjacent makes every
-  P1_i-ancilla_i pair also a coupler; a layout was found for d=2 only, none for d=3.
+- `--smoke`: a single circuit, known-answer arm B, d=2, 200 shots, Garnet,
+  `--layout nonadj`, no calibration. Layout T=[10], P1=[11,12], ancillas=[20,4];
+  copy pairs $11->$20 and $12->$4 are both non-couplers within group 2; 22 CZ,
+  est. survival 0.69; cost $0.59. It tests whether the device accepts
+  non-adjacent `cc_prx`. The dry run prints each copy pair as coupler /
+  non-coupler. Run this first.
+- `--layout primary|adjacent|nonadj`: primary puts the ancilla anywhere in P1's
+  qubit group (`cc_prx` is classically controlled). Adjacent makes every
+  P1_i-ancilla_i pair also a coupler. Nonadj makes no P1_i-ancilla_i pair a
+  coupler and uses only qubits with readout fidelity >= 0.98 for P1 and
+  ancillas (Garnet: 3, 4, 10, 11, 12, 20).
+- No fallback above d=2: `--layout adjacent` builds d=2 only; the search found no
+  d=3 layout (a search limit, not a proof). If the smoke test shows non-adjacent
+  `cc_prx` is rejected, d=3 is not possible with this code. The smoke test
+  decides whether d=3 is possible.
 - Two readout-calibration circuits (|0..0>, |1..1>) on the measured qubits are
   added to each batch (`--no-cal` omits them). `checkRetrieve.py` prints the
   witness agreement next to the readout-only prediction.
@@ -72,8 +86,9 @@ Garnet $0.30/task + $0.00145/shot; Emerald $0.30/task + $0.00160/shot.
 - Garnet groups were read off AWS figures, so the `cc_prx` group rule is only
   as good as that reading; Emerald groups are unchecked.
 - One `measure_ff` key driving two `cc_prx` (Breuse) is unconfirmed on the device.
-- Whether the device accepts non-adjacent feed-forward (primary layout) is
-  unconfirmed; `--layout adjacent` is the fallback, for d=2 only.
+- Whether the device accepts non-adjacent feed-forward (primary / nonadj
+  layouts) is unconfirmed. The smoke test decides it. `--layout adjacent` works
+  for d=2 only, so if non-adjacent `cc_prx` is rejected there is no d=3.
 - Bit ordering of returned strings (ascending physical qubit) is to be
   confirmed by the known-answer arm on the first hardware run.
 - Prices are from the AWS pricing page, not from a billed task.

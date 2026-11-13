@@ -146,6 +146,9 @@ def _route(logical, sites, caps, allowed, seed=7):
 
 
 # -- program planner ----------------------------------------------------------
+GOOD_RO = 0.98   # readout fidelity floor for the nonadj layout
+
+
 def build_program(arm, d, nt, U, init, caps, seed=7, layout="primary"):
     """Try every hub in the region (best-connected first) and keep the program with the
     fewest CZ. A hub is rejected when removing P1/ancilla sites leaves stage 2 unroutable."""
@@ -163,6 +166,8 @@ def build_program(arm, d, nt, U, init, caps, seed=7, layout="primary"):
 
 def _build(arm, d, nt, U, init, caps, hub, seed=7, layout="primary"):
     """layout 'primary': ancilla anywhere in P1_i's group (cc_prx is classically controlled).
+    layout 'nonadj': copy pairs are NOT couplers and every P1/ancilla qubit has fro >= GOOD_RO
+    (smoke test: forces the device to accept non-adjacent cc_prx).
     layout 'adjacent': every P1_i-ancilla_i pair is also a coupler (fallback if the device
     rejects non-adjacent feed-forward). P1/ancilla avoid caps['ro_avoid'] (poor readout):
     readout error there would be mistaken for measurement disturbance in the witness."""
@@ -171,6 +176,9 @@ def _build(arm, d, nt, U, init, caps, hub, seed=7, layout="primary"):
     body ops: ('prx',q,th,ph) ('cz',a,b) ('measure_ff',q,key) ('cc_prx',q,th,ph,key)."""
     assert arm in ("A", "B", "Breuse")
     adj = _adj(caps)
+    if layout == "nonadj":     # P1 and ancillas only on good-readout qubits; no P1_i-ancilla_i coupler
+        good = {int(q) for q, f in (caps.get("fro") or {}).items() if f >= GOOD_RO}
+        avoid = avoid | (set(caps["nodes"]) - good)
     t_sites = [hub] + _bfs_order(adj, hub, {hub})[:nt - 1]
     p1 = _bfs_order(adj, hub, set(t_sites) | avoid)[:d]
     body, nodes = [], set(caps["nodes"])
@@ -183,7 +191,7 @@ def _build(arm, d, nt, U, init, caps, hub, seed=7, layout="primary"):
     taken, anc = set(p1_f) | set(t_f), []
     for s in p1_f:
         cand = [q for q in _bfs_order(adj, s, taken | avoid) if _group_of(caps, q) == _group_of(caps, s)
-                and (layout == "primary" or q in adj[s])]
+                and (layout == "primary" or (q in adj[s]) == (layout == "adjacent"))]
         if not cand: raise RuntimeError("no ancilla site")
         anc.append(cand[0]); taken.add(cand[0])
     if arm == "B":
@@ -378,3 +386,19 @@ def append_job_log(results_dir, record):
     p = os.path.join(results_dir, "job_log.txt")
     with open(p, "a") as f: f.write(json.dumps(record) + "\n")
     return p
+
+
+def reference_pairs(d, nt, U, init):
+    """Noiseless P(m1, m2) from one statevector of the whole two-stage circuit (no routing,
+    no mid-circuit measurement): the independent reference for arm A. Qubits: P1 0..d-1,
+    T d..d+nt-1, P2 d+nt..; decode m = sum_k c_k 2^(d-1-k) per stage."""
+    from qiskit.quantum_info import Statevector
+    T = list(range(d, d + nt)); P2 = list(range(d + nt, 2 * d + nt))
+    qc = QuantumCircuit(2 * d + nt)
+    qc.compose(stage_logical(d, nt, U, init), list(range(d)) + T, inplace=True)
+    qc.compose(stage_logical(d, nt, U, None), P2 + T, inplace=True)
+    pr = Statevector(qc).probabilities(list(range(d)) + P2)    # bit j of index = qubit qargs[j]
+    M = np.zeros((2 ** d, 2 ** d)); w = [2 ** (d - 1 - k) for k in range(d)]
+    for i, v in enumerate(pr):
+        M[sum(w[k] for k in range(d) if i >> k & 1), sum(w[k] for k in range(d) if i >> (d + k) & 1)] += v
+    return M

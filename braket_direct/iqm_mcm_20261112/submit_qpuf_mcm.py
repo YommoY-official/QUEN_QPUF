@@ -60,6 +60,13 @@ def report(jobs, device, shots, caps):
         c, p = j["counts"], j["prog"]
         print(f"{j['label']:<24}{c['qubits']:>7}{c['cz']:>5}{c['prx']:>6}{c['measure_ff']:>5}{c['cc_prx']:>6}{c['depth']:>7}{est_success(p, caps['fid']) if caps.get('fid') else float('nan'):>8.4f}  "
               f"{p['t_sites']} | {p['p1_stage1']} | {p['anc']} | {p['p2']}")
+    print("\ncopy pairs P1_i -> ancilla_i (cc_prx source -> target), readout fidelity where known:")
+    for j in jobs:
+        if j["prog"]["arm"] in ("B", "Breuse"):
+            adj = {tuple(sorted(e)) for e in caps["edges"]}; fro = caps.get("fro") or {}
+            print(f"  {j['label']:<18}" + "  ".join(
+                f"${a}->${b} {'COUPLER' if tuple(sorted((a, b))) in adj else 'non-coupler'}"
+                f" (ro {fro.get(str(a), '?')}/{fro.get(str(b), '?')})" for a, b in zip(j["prog"]["p1_stage1"], j["prog"]["anc"])))
     errs = sorted({e for j in jobs for e in j["rules"][0]}); warns = sorted({w for j in jobs for w in j["rules"][1]})
     print("\nIQM dynamic-circuit rules:", "OK" if not errs else "VIOLATIONS")
     for e in errs: print("   ERROR  ", e)
@@ -78,17 +85,17 @@ def main():
     ap.add_argument("--d", type=int, nargs="+", default=[2, 3], help="precision qubits per stage")
     ap.add_argument("--arms", nargs="+", default=["A", "B"], choices=["A", "B", "Breuse"])
     ap.add_argument("--shots", type=int, default=1000)
-    ap.add_argument("--layout", choices=["primary", "adjacent"], default="primary",
-                    help="primary: ancilla anywhere in P1's qubit group; adjacent: each P1_i-ancilla_i pair is also a coupler")
+    ap.add_argument("--layout", choices=["primary", "adjacent", "nonadj"], default="primary",
+                    help="primary: ancilla anywhere in P1's qubit group; adjacent: each P1_i-ancilla_i pair is also a coupler; nonadj: no pair is a coupler, good-readout qubits only")
     ap.add_argument("--smoke", action="store_true",
-                    help="single circuit: known-answer arm B, d=2, 200 shots, primary layout, no calibration")
+                    help="single circuit: known-answer arm B, d=2, 200 shots, nonadj layout, no calibration")
     ap.add_argument("--no-cal", action="store_true", help="omit the two readout-calibration circuits")
     ap.add_argument("--dry-run", action="store_true", help="build and report only; submit nothing")
     a = ap.parse_args()
 
     caps = load_caps(a.device)
     if a.smoke:
-        a.d, a.arms, a.shots, a.layout, a.no_cal = [2], ["B"], 200, "primary", True
+        a.d, a.arms, a.shots, a.layout, a.no_cal = [2], ["B"], 200, "nonadj", True
     try:
         jobs = build_jobs(a.device, a.d, a.arms, caps, a.layout, not a.no_cal)
     except RuntimeError as e:

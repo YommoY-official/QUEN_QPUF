@@ -11,16 +11,15 @@ Checks (per d in 2,3):
   1. known answer (phase 1/2^d, target |1>): m1 = m2 = 1 with probability 1, all arms
   2. arm B: ancilla copy == re-read P1 with probability 1 (noiseless)
   3. noiseless P(m1,m2): arm A == arm B == arm Breuse (deferred-measurement theorem)
-  4. arm A vs the full-circuit statevector reference (make_notes_figs.sim_counts,
-     fixed circuit, per-stage bit reversal) -- validates routing + decode
+  4. arm A vs the full-circuit statevector reference (reference_pairs: one
+     statevector of the whole circuit, no routing) -- validates routing + decode
 """
 import sys, os, warnings
 import numpy as np
 warnings.filterwarnings("ignore")
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(HERE, "../../docs/plot_ledger"))
+sys.path.insert(0, HERE)
 from iqm_qpuf_common import *
-from make_notes_figs import sim_counts
 
 SHOTS = 100000; DEV = sys.argv[1] if len(sys.argv) > 1 else "garnet"
 caps = load_caps(DEV); ok = True
@@ -39,6 +38,15 @@ def run(arm, d, U, init):
     return M, agree, p
 
 
+print("\n=== smoke layout (nonadj), d=2, known answer, arm B ===")
+_p = build_program("B", 2, 1, known_phase_unitary(1, 1 / 4), "ones", caps, layout="nonadj")
+_adj_e = {tuple(sorted(e)) for e in caps["edges"]}
+check("copy pairs are non-couplers", all(tuple(sorted(x)) not in _adj_e for x in zip(_p["p1_stage1"], _p["anc"])), f"{list(zip(_p['p1_stage1'], _p['anc']))}")
+_b, _o = ops_from_qasm(to_qasm(_p)); _M, _ag = decode(simulate_ops(_b, _o, SHOTS), dict(arm="B", d=2, measure=_p["measure"], order=_p["order"]))
+check("smoke: P(m1=1,m2=1)", _M[1, 1] > 1 - 1e-9, f"= {_M[1, 1]:.6f}"); check("smoke: ancilla == re-read P1", _ag > 1 - 1e-9)
+check("smoke: dynamic-circuit rules", not check_dynamic_rules(_p, caps)[0])
+
+
 for d in (2, 3):
     print(f"\n=== d={d}, n_t=1, {DEV} ({'real caps' if caps['real'] else 'PLACEHOLDER lattice'}) ===")
     Uk = known_phase_unitary(1, 1 / 2 ** d)
@@ -53,8 +61,7 @@ for d in (2, 3):
     check("Haar arm B: ancilla == re-read P1", ags["B"] > 1 - 1e-9, f"= {ags['B']:.6f}")
     tol = 4 * np.sqrt(2 ** (2 * d) / SHOTS)             # generous TVD sampling bound
     tv = lambda a, b: 0.5 * np.abs(Ms[a] - Ms[b]).sum()
-    ref = np.zeros((2 ** d, 2 ** d))
-    for k, v in sim_counts(d, 1, U, 99, True, True).items(): ref[int(k[d:][::-1], 2), int(k[:d][::-1], 2)] += v
+    ref = reference_pairs(d, 1, U, 99)
     for a, b in (("A", "B"), ("A", "Breuse")):
         check(f"noiseless TVD({a},{b}) within sampling", tv(a, b) < tol, f"= {tv(a, b):.4f} (tol {tol:.4f})")
     for arm in Ms:
