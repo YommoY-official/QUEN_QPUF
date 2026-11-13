@@ -88,14 +88,17 @@ def main():
     ap.add_argument("--layout", choices=["primary", "adjacent", "nonadj"], default="primary",
                     help="primary: ancilla anywhere in P1's qubit group; adjacent: each P1_i-ancilla_i pair is also a coupler; nonadj: no pair is a coupler, good-readout qubits only")
     ap.add_argument("--smoke", action="store_true",
-                    help="single circuit: known-answer arm B, d=2, 200 shots, nonadj layout, no calibration")
+                    help="single circuit: known-answer arm B, d=2, 200 shots, primary layout (the originally submitted smoke test), no calibration")
+    ap.add_argument("--smoke-nonadj", action="store_true",
+                    help="like --smoke but nonadj layout: copy pairs are not couplers, good-readout qubits only (program B_d2_known_nonadj.qasm)")
     ap.add_argument("--no-cal", action="store_true", help="omit the two readout-calibration circuits")
     ap.add_argument("--dry-run", action="store_true", help="build and report only; submit nothing")
     a = ap.parse_args()
 
     caps = load_caps(a.device)
-    if a.smoke:
-        a.d, a.arms, a.shots, a.layout, a.no_cal = [2], ["B"], 200, "nonadj", True
+    if a.smoke or a.smoke_nonadj:
+        a.smoke = True
+        a.d, a.arms, a.shots, a.layout, a.no_cal = [2], ["B"], 200, "nonadj" if a.smoke_nonadj else "primary", True
     try:
         jobs = build_jobs(a.device, a.d, a.arms, caps, a.layout, not a.no_cal)
     except RuntimeError as e:
@@ -107,7 +110,7 @@ def main():
     os.makedirs(os.path.join(RESULTS_DIR, "programs"), exist_ok=True)
     print(f"\nlayout mode: {a.layout}")
     for j in jobs:                                   # inspectable copy of every program, even on --dry-run
-        open(os.path.join(RESULTS_DIR, "programs", j["label"].replace(" ", "_").replace("=", "") + ".qasm"), "w").write(j["qasm"])
+        open(os.path.join(RESULTS_DIR, "programs", j["label"].replace(" ", "_").replace("=", "") + ("_nonadj" if a.layout == "nonadj" else "") + ".qasm"), "w").write(j["qasm"])
     if a.dry_run:
         print("\n--dry-run: nothing submitted. Programs written to job_results/programs/."); return
     if not caps["real"]:
