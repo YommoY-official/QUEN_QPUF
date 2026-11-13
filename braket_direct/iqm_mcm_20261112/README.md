@@ -41,12 +41,20 @@ Default arms are now A and B.
 
 ## Submit options
 
-- `--smoke`: a single circuit, known-answer arm B, d=2, 200 shots, Garnet,
-  `--layout nonadj`, no calibration. Layout T=[10], P1=[11,12], ancillas=[20,4];
-  copy pairs $11->$20 and $12->$4 are both non-couplers within group 2; 22 CZ,
-  est. survival 0.69; cost $0.59. It tests whether the device accepts
-  non-adjacent `cc_prx`. The dry run prints each copy pair as coupler /
+- `--smoke`: the original smoke test. A single circuit, known-answer arm B, d=2,
+  200 shots, Garnet, primary layout, no calibration. Layout T=[5], P1=[1,4],
+  ancillas=[2,3]; at d=2 both copy pairs $1->$2 and $4->$3 are couplers
+  (adjacent). Program `job_results/programs/B_d2_known.qasm` (commit b27ea26).
+  Yon submitted it from the DCV box on 2026-11-13; `B_d2_known.qasm` must stay
+  as submitted.
+- `--smoke-nonadj`: the non-adjacent smoke test. A single circuit, known-answer
+  arm B, d=2, 200 shots, Garnet, `--layout nonadj`, no calibration. Layout
+  T=[10], P1=[11,12], ancillas=[20,4]; copy pairs $11->$20 and $12->$4 are both
+  non-couplers within group 2; 22 CZ, est. survival 0.69; cost $0.59. It tests
+  whether the device accepts non-adjacent `cc_prx`. Program
+  `B_d2_known_nonadj.qasm`. The dry run prints each copy pair as coupler /
   non-coupler. Run this first.
+- Each smoke flag maps to exactly one program file.
 - `--layout primary|adjacent|nonadj`: primary puts the ancilla anywhere in P1's
   qubit group (`cc_prx` is classically controlled). Adjacent makes every
   P1_i-ancilla_i pair also a coupler. Nonadj makes no P1_i-ancilla_i pair a
@@ -59,8 +67,9 @@ Default arms are now A and B.
 - Two readout-calibration circuits (|0..0>, |1..1>) on the measured qubits are
   added to each batch (`--no-cal` omits them). `checkRetrieve.py` prints the
   witness agreement next to the readout-only prediction.
-- The layout stays in the largest group (Garnet group 2) and avoids the
-  poor-readout qubits 5, 16, 17 for P1 and ancillas.
+- The layout stays in the largest group (Garnet group 2). The primary and
+  adjacent layouts avoid the poor-readout qubits 5, 16, 17 for P1 and ancillas;
+  nonadj uses only qubits with readout fidelity >= 0.98 (3, 4, 10, 11, 12, 20).
 
 ## Workflow
 
